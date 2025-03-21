@@ -3,9 +3,11 @@
 > Quick, focused learning paths for cross-domain technology skills
 
 ## Overview
-
-Savvy-Acumen is a curated collection of crash courses designed for professionals who need to quickly learn specific technical skills from different domains for their project requirements. Instead of going through lengthy courses or getting distracted by irrelevant content, this repository provides concentrated learning paths that can be completed within approximately one week.
-
+Savvy-Acumen is my curated collection of quick-grasp playbooks, born out of my own need for focused, self-reliant learning. I started this repository to cut through the noise of scattered resources across the internet and build the precise skills required for my projects. 
+Instead of wading through endless courses or getting lost in irrelevant content, this repo offers concentrated, practical learning paths—each designed to be completed in about a week. It’s my way of staying sharp, efficient, and adaptable in the fast-paced world of tech.
+<!--
+Savvy-Acumen is a curated collection of quick grasp playbooks designed for professionals who need to quickly learn specific technical skills from different domains for their project requirements. Instead of going through lengthy courses or getting distracted by irrelevant content, this repository provides concentrated learning paths that can be completed within approximately one week.
+-->
 ## 🎯 Purpose
 
 - **Focused Learning**: Get straight to what you need without the fluff
