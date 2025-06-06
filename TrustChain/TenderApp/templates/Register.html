@@ -1,9 +1,12 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - New Bidder Registration</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
  <script LANGUAGE="Javascript" >
 function validate(){
 	var x=document.forms["f1"]["username"].value;
@@ -62,67 +65,91 @@ function validate(){
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-     <ul>
-      <li><a href="{% url 'index' %}">Home</a></li>
-      <li><a href="{% url 'TenderLogin' %}">Tender Officer Login</a></li>
-	  <li><a href="{% url 'BidderLogin' %}">Bidder Login</a></li>
-      <li><a href="{% url 'Register' %}">New Bidder Signup Here</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'index' %}"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="{% url 'TenderLogin' %}"><i class="fas fa-user-shield"></i> Tender Officer Login</a></li>
+        <li><a href="{% url 'BidderLogin' %}"><i class="fas fa-user-tie"></i> Bidder Login</a></li>
+        <li class="current_page_item"><a href="{% url 'Register' %}"><i class="fas fa-user-plus"></i> New Bidder Signup</a></li>
+      </ul>
+    </div>
   </div>
-  <div class="entry">
-   <br/><br/><br/>
-	<font size="" color="white"><center>{{ data|safe }}</center></font>
-	 <br>
-	 <center><font size="3" color="white">New Bidder Signup Screen</font></center>
-	<form name="f1" method="post" action={% url 'Signup' %} OnSubmit="return validate()">
-	{% csrf_token %}
-	<br><br>
-	<TABLE align=center width="35%" class="notepad">
-		<TR><TH align="left"><font size="" color="white">Username
-		<TD>&nbsp;&nbsp;<Input type=text name="username" value='' class="form-control" size="30">
-		<div id='nameid'></div>
-		</TD>
-		</TR>
-		
-		<TR><TH align="left"><font size="" color="white">Password
-		<TD>&nbsp;&nbsp;<Input type='password' name="password"  value='' size="30">
-		</TR>
-		
-		<TR><TH align="left"><font size="" color="white">Contact No
-		<TD>&nbsp;&nbsp;<Input type='text' size= "15" name="contact"  value='' size="15">
-		</TR>
+  <div id="page">
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-user-plus"></i> Bidder Registration</h2>
+          </div>
+          <div class="entry">
+            {% if data %}
+              <div class="card">
+                {{ data|safe }}
+              </div>
+            {% endif %}
+            
+            <div class="card">
+              <form name="f1" method="post" action={% url 'Signup' %} onsubmit="return validate()">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                  <label for="username"><i class="fas fa-user"></i> Username</label>
+                  <input type="text" name="username" id="username" placeholder="Choose a username" class="form-control">
+                  <div id='nameid'></div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="password"><i class="fas fa-lock"></i> Password</label>
+                  <input type="password" name="password" id="password" placeholder="Create a secure password" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="contact"><i class="fas fa-phone"></i> Contact Number</label>
+                  <input type="text" name="contact" id="contact" placeholder="Your contact number" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="email"><i class="fas fa-envelope"></i> Email Address</label>
+                  <input type="email" name="email" id="email" placeholder="Your email address" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="cname"><i class="fas fa-building"></i> Company Name</label>
+                  <input type="text" name="cname" id="cname" placeholder="Your company name" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="address"><i class="fas fa-map-marker-alt"></i> Company Address</label>
+                  <input type="text" name="address" id="address" placeholder="Your company address" class="form-control">
+                </div>
+                
+                <div class="text-center">
+                  <button type="submit" class="btn"><i class="fas fa-user-plus"></i> Register</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-		<TR><TH align="left"><font size="" color="white">Email ID
-		<TD>&nbsp;&nbsp;<Input type='text' size="25" name="email"  size="35">
-		</TR>
-
-		<TR><TH align="left"><font size="" color="white">Company&nbsp;Name
-		<TD>&nbsp;&nbsp;<Input type='text' size="35" name="cname" size="40">
-		</TR>
-
-		<TR><TH align="left"><font size="" color="white">Company&nbsp;Address
-		<TD>&nbsp;&nbsp;<Input type='text' size="50" name="address"  size="40">
-		</TR>
-
-		  <TR>
-				 <TD></TD>
-			<TD>	
-		  <input type="submit" value="Register">
-		 
-		  </TABLE>
-		
-</form>
-</div>
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
+  </div>
 
 </body>
 </html>

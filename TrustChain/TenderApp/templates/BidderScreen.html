@@ -1,50 +1,80 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Bidder Dashboard</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'BidTender' %}">Bid Tender</a></li>
-      <li><a href="{% url 'ViewTender' %}">View Tender Status</a></li>
-	  <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
+        <li><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
   <div id="page">
-   <div id="content">
-      <div class="post">
-        <div class="title">
-          <h2>Smart Tender/Contract Management System Using Blockchain</h2>
-         </div>
-        <div class="entry">
-		
-<font size="" color="white"><center>{{ data|safe }}</center></font>
-	 
-	
-          <p><img src="{% static 'images/images.jpg' %}" alt="" width="890" height="200" class="left" /><p></p><font size="4" color="white">
-          
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-user-tie"></i> Bidder Dashboard</h2>
           </div>
-        
+          <div class="entry">
+            {% if data %}
+            <div class="card">
+              {{ data|safe }}
+            </div>
+            {% endif %}
+            
+            <div class="card">
+              <div class="card-title">
+                <h3>Bidder Actions</h3>
+              </div>
+              <div class="text-center" style="display: flex; justify-content: space-around; margin: 2rem 0;">
+                <a href="{% url 'BidTender' %}" class="btn">
+                  <i class="fas fa-gavel fa-2x"></i><br>
+                  Bid on Tender
+                </a>
+                <a href="{% url 'ViewTender' %}" class="btn btn-secondary">
+                  <i class="fas fa-clipboard-list fa-2x"></i><br>
+                  View Tender Status
+                </a>
+              </div>
+            </div>
+
+            <div class="card">
+              <img src="{% static 'images/images.jpg' %}" alt="Blockchain Technology" class="img-fluid" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;" />
+              <h3>Welcome to TrustChain</h3>
+              <p>As a bidder on our platform, you can participate in tenders with complete confidence in the security and transparency provided by our blockchain technology.</p>
+            </div>
+          </div>
+        </div>
       </div>
-     
-       
-       
     </div>
-    
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
   </div>
 
 </body>

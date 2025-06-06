@@ -1,9 +1,12 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Bidder Login</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
  <script LANGUAGE="Javascript" >
 function validate(){
 	var x=document.forms["f1"]["username"].value;
@@ -27,50 +30,70 @@ function validate(){
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-     <ul>
-      <li><a href="{% url 'index' %}">Home</a></li>
-      <li><a href="{% url 'TenderLogin' %}">Tender Officer Login</a></li>
-	  <li><a href="{% url 'BidderLogin' %}">Bidder Login</a></li>
-      <li><a href="{% url 'Register' %}">New Bidder Signup Here</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'index' %}"><i class="fas fa-home"></i> Home</a></li>
+        <li><a href="{% url 'TenderLogin' %}"><i class="fas fa-user-shield"></i> Tender Officer Login</a></li>
+        <li class="current_page_item"><a href="{% url 'BidderLogin' %}"><i class="fas fa-user-tie"></i> Bidder Login</a></li>
+        <li><a href="{% url 'Register' %}"><i class="fas fa-user-plus"></i> New Bidder Signup</a></li>
+      </ul>
+    </div>
   </div>
-  <div class="entry">
-   <br/><br/><br/>
-	<font size="" color="white"><center>{{ data }}</center></font>
-	 <br>
-	 <center><font size="3" color="white">Bidder Login Screen</font></center>
-	<form name="f1" method="post" action={% url 'BidderLoginAction' %} OnSubmit="return validate()">
-	{% csrf_token %}
-	<br><br>
-	<TABLE align=center width="35%" class="notepad">
-		<TR><TH align="left"><font size="" color="white">Username
-		<TD>&nbsp;&nbsp;<Input type=text name="username" value='' class="form-control">
-		<div id='nameid'></div>
-		</TD>
-		</TR>
-		
-		<TR><TH align="left"><font size="" color="white">Password
-		<TD>&nbsp;&nbsp;<Input type='password' name="password"  value='' class="form-control">
-		</TR>
-		  <TR>
-				 <TD></TD>
-			<TD>	
-		  <input type="submit" value="login">
-		 
-		  </TABLE>
-		
-</form>
-</div>
+  <div id="page">
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-user-tie"></i> Bidder Login</h2>
+          </div>
+          <div class="entry">
+            {% if data %}
+              <div class="card">
+                {{ data }}
+              </div>
+            {% endif %}
+            
+            <div class="card">
+              <form name="f1" method="post" action={% url 'BidderLoginAction' %} onsubmit="return validate()">
+                {% csrf_token %}
+                <div class="form-group">
+                  <label for="username"><i class="fas fa-user"></i> Username</label>
+                  <input type="text" name="username" id="username" placeholder="Enter your username" class="form-control">
+                  <div id='nameid'></div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="password"><i class="fas fa-lock"></i> Password</label>
+                  <input type="password" name="password" id="password" placeholder="Enter your password" class="form-control">
+                </div>
+                
+                <div class="text-center">
+                  <button type="submit" class="btn"><i class="fas fa-sign-in-alt"></i> Login</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
+  </div>
 
 </body>
 </html>
