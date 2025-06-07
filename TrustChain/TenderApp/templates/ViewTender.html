@@ -1,52 +1,85 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - View Tender Status</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'BidTender' %}">Bid Tender</a></li>
-      <li><a href="{% url 'ViewTender' %}">View Tender Status</a></li>
-	  <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
+        <li class="current_page_item"><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
   <div id="page">
-   <div id="content">
-      <div class="post">
-        <div class="title">
-          <h2>Smart Tender/Contract Management System Using Blockchain</h2>
-         </div>
-        <div class="entry">
-		 <br/><br/><br/>
-	 
-	 <br>
-          <p><img src="{% static 'images/images.jpg' %}" alt="" width="890" height="200" class="left" /><p></p><font size="4" color="white">
-
-		  {{ data|safe }}
-          
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-clipboard-list"></i> Your Tender Bids</h2>
           </div>
-        
+          <div class="entry">
+            {% if data and data != '' %}
+              <div class="card">
+                <div class="card-title">
+                  <h3>Bid Status</h3>
+                </div>
+                <div class="table-responsive">
+                  {{ data|safe }}
+                </div>
+              </div>
+            {% else %}
+              <div class="card empty-state">
+                <div class="empty-icon">
+                  <i class="fas fa-filter"></i>
+                </div>
+                <h3>No Bids Found</h3>
+                <p>You haven't placed any bids yet or none are currently active.</p>
+                <a href="{% url 'BidTender' %}" class="btn"><i class="fas fa-gavel"></i> View Available Tenders</a>
+              </div>
+            {% endif %}
+            <div class="card info-card">
+              <h4><i class="fas fa-info-circle"></i> About Tender Status</h4>
+              <p>The status of your bids is automatically updated when a tender is evaluated by the tender officer. All results are permanently stored on the blockchain for complete transparency.</p>
+              <div class="status-info">
+                <div class="status-item">
+                  <span class="badge badge-warning"><i class="fas fa-hourglass"></i> Pending</span>
+                  <p>Your bid is under evaluation</p>
+                </div>
+                <div class="status-item">
+                  <span class="badge badge-success"><i class="fas fa-trophy"></i> Winner</span>
+                  <p>Congratulations! Your bid was selected</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-     
-       
-       
     </div>
-    
   </div>
-
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
+  </div>
 </body>
 </html>

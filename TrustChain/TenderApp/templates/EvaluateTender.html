@@ -1,51 +1,87 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Evaluate Tenders</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'CreateTender' %}">Create Tender Notification</a></li>
-      <li><a href="{% url 'EvaluateTender' %}">Evaluate Tender & Negotiation</a></li>
-	  <li><a href="{% url 'WinnerSelection' %}">Winner Selection</a></li>
-      <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
+        <li class="current_page_item"><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
+        <li><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
   <div id="page">
-   <div id="content">
-      <div class="post">
-        <div class="title">
-          <h2>Blockchain Based E-Tendering System</h2>
-         </div>
-        <div class="entry">
-		 <br/><br/><br/>
-<font size="" color="white"><center>{{ data|safe }}</center></font>
-	 
-	 <br>
-          <p><img src="{% static 'images/images.jpg' %}" alt="" width="890" height="200" class="left" /><p></p><font size="4" color="white">
-          
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-tasks"></i> Evaluate Tenders & Negotiation</h2>
           </div>
-        
+          <div class="entry">
+            <div class="card">
+              <div class="card-title">
+                <h3>Tender Submissions</h3>
+              </div>
+              {{ data|safe }}
+              
+              {% if not data %}
+              <div class="text-center" style="padding: 2rem;">
+                <i class="fas fa-info-circle fa-3x" style="color: var(--primary-color); margin-bottom: 1rem;"></i>
+                <h4>No Tender Submissions Available</h4>
+                <p>There are currently no tender submissions to evaluate. Create a tender first to allow bidders to submit their proposals.</p>
+                <a href="{% url 'CreateTender' %}" class="btn"><i class="fas fa-file-contract"></i> Create New Tender</a>
+              </div>
+              {% endif %}
+            </div>
+            
+            <div class="card">
+              <div class="row">
+                <div class="col-md-5">
+                  <img src="{% static 'images/images.jpg' %}" alt="Blockchain Technology" class="img-fluid" style="width: 100%; max-height: 250px; object-fit: cover; border-radius: 6px;"/>
+                </div>
+                <div class="col-md-7">
+                  <h3>Secure Evaluation Process</h3>
+                  <p>TrustChain provides a transparent and secure platform for evaluating tender submissions. Each evaluation is recorded on the blockchain, ensuring:</p>
+                  <ul class="feature-list">
+                    <li><i class="fas fa-shield-alt"></i> Complete transparency in the decision process</li>
+                    <li><i class="fas fa-balance-scale"></i> Fair and unbiased assessment of all bids</li>
+                    <li><i class="fas fa-handshake"></i> Secure negotiation with potential winners</li>
+                    <li><i class="fas fa-history"></i> Immutable audit trail of all evaluation activities</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-     
-       
-       
     </div>
-    
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
   </div>
 
 </body>

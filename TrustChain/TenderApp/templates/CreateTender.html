@@ -1,9 +1,12 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Create New Tender</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
  <script LANGUAGE="Javascript" >
 function validate(){
 	var x=document.forms["f1"]["t1"].value;
@@ -46,63 +49,115 @@ function validate(){
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'CreateTender' %}">Create Tender Notification</a></li>
-      <li><a href="{% url 'EvaluateTender' %}">Evaluate Tender & Negotiation</a></li>
-	  <li><a href="{% url 'WinnerSelection' %}">Winner Selection</a></li>
-      <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li class="current_page_item"><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
+        <li><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
+        <li><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
-  <div class="entry">
-   <br/><br/><br/>
-	<font size="" color="white"><center>{{ data|safe }}</center></font>
-	 <br>
-	 <center><font size="3" color="white">Create Tender Screen</font></center>
-	<form name="f1" method="post" action={% url 'CreateTenderAction' %} OnSubmit="return validate()">
-	{% csrf_token %}
-	<br><br>
-	<TABLE align=center width="35%" class="notepad">
-		<TR><TH align="left"><font size="" color="white">Tender&nbsp;Title
-		<TD><Input type=text name="t1" size="40"></div>
-		</TD>
-		</TR>
-		
-		<TR><TH align="left"><font size="" color="white">Tender&nbsp;Description
-		<TD>&nbsp;&nbsp;<Input type='text' name="t2" size="80">
-		</TR>
+  <div id="page">
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-file-contract"></i> Create New Tender</h2>
+          </div>
+          <div class="entry">
+            {% if data %}
+            <div class="card">
+              {{ data|safe }}
+            </div>
+            {% endif %}
+            
+            <div class="card">
+              <div class="card-title">
+                <h3>Tender Details</h3>
+              </div>
+              <form name="f1" method="post" action={% url 'CreateTenderAction' %} onsubmit="return validate()">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                  <label for="t1"><i class="fas fa-heading"></i> Tender Title</label>
+                  <input type="text" name="t1" id="t1" placeholder="Enter tender title" class="form-control">
+                </div>
+                
+                <div class="form-group">
+                  <label for="t2"><i class="fas fa-align-left"></i> Tender Description</label>
+                  <textarea name="t2" id="t2" placeholder="Enter detailed description of the tender" class="form-control" rows="4"></textarea>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group col-md-6">
+                    <label for="demo"><i class="fas fa-calendar-plus"></i> Opening Date</label>
+                    <div class="input-group">
+                      <input name="t3" type="text" id="demo" maxlength="25" placeholder="DD/MM/YYYY" class="form-control">
+                      <div class="input-group-append">
+                        <a href="javascript:NewCal('demo','ddmmyyyy',false,24)" class="btn btn-secondary">
+                          <img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date">
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div class="form-group col-md-6">
+                    <label for="demo1"><i class="fas fa-calendar-times"></i> Closing Date</label>
+                    <div class="input-group">
+                      <input name="t4" type="text" id="demo1" maxlength="25" placeholder="DD/MM/YYYY" class="form-control">
+                      <div class="input-group-append">
+                        <a href="javascript:NewCal('demo1','ddmmyyyy',false,24)" class="btn btn-secondary">
+                          <img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date">
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="t5"><i class="fas fa-coins"></i> Tender Amount</label>
+                  <div class="input-group">
+                    <div class="input-group-prepend">
+                      <span class="input-group-text">$</span>
+                    </div>
+                    <input type="text" name="t5" id="t5" placeholder="Enter tender amount" class="form-control">
+                  </div>
+                </div>
+                
+                <div class="text-center">
+                  <button type="submit" class="btn"><i class="fas fa-plus-circle"></i> Create Tender</button>
+                </div>
+              </form>
+            </div>
+            
+            <div class="card">
+              <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i> <strong>Important:</strong> All tenders created will be securely stored on the blockchain, ensuring immutability and transparency throughout the tender process.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-		<tr><TH><font size="" color="white">Open</td><td>
-<input name="t3" type="Text" id="demo" maxlength="25" size="20" class="c2" ><a href="javascript:NewCal('demo','ddmmyyyy',false,24)"><img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date"></a>
-	  		<span class="descriptions"></span>
-</td></tr>
-
-<tr><TH><font size="" color="white">Close</td><td>
-<input name="t4" type="Text" id="demo1" maxlength="25" size="20" class="c2" ><a href="javascript:NewCal('demo1','ddmmyyyy',false,24)"><img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date"></a>
-	  		<span class="descriptions"></span>
-</td></tr>
-<TR><TH align="left"><font size="" color="white">Tender&nbsp;Amount
-		<TD>&nbsp;&nbsp;<Input type='text' name="t5" size="30">
-		</TR>
-
-		  <TR>
-				 <TD></TD>
-			<TD>	
-		  <input type="submit" value="Create Tender">
-		 
-		  </TABLE>
-		
-</form>
-</div>
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
+  </div>
 
 </body>
 </html>

@@ -1,51 +1,85 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Tender Officer Dashboard</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'CreateTender' %}">Create Tender Notification</a></li>
-      <li><a href="{% url 'EvaluateTender' %}">Evaluate Tender & Negotiation</a></li>
-	  <li><a href="{% url 'WinnerSelection' %}">Winner Selection</a></li>
-      <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
+        <li><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
+        <li><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
   <div id="page">
-   <div id="content">
-      <div class="post">
-        <div class="title">
-          <h2>Smart Tender/Contract Management System Using Blockchain</h2>
-         </div>
-        <div class="entry">
-		 <br/>
-<font size="" color="white"><center>{{ data }}</center>
-	 
-	
-          <p><img src="{% static 'images/images.jpg' %}" alt="" width="890" height="200" class="left" /><p></p><font size="4" color="white">
-          
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-user-shield"></i> Tender Officer Dashboard</h2>
           </div>
-        
+          <div class="entry">
+            {% if data %}
+            <div class="card">
+              {{ data }}
+            </div>
+            {% endif %}
+            
+            <div class="card">
+              <div class="card-title">
+                <h3>Tender Management Actions</h3>
+              </div>
+              <div class="text-center" style="display: flex; flex-wrap: wrap; justify-content: space-around; gap: 15px; margin: 2rem 0;">
+                <a href="{% url 'CreateTender' %}" class="btn" style="min-width: 180px; margin-bottom: 15px;">
+                  <i class="fas fa-file-contract fa-2x"></i><br>
+                  Create Tender
+                </a>
+                <a href="{% url 'EvaluateTender' %}" class="btn btn-secondary" style="min-width: 180px; margin-bottom: 15px;">
+                  <i class="fas fa-tasks fa-2x"></i><br>
+                  Evaluate & Negotiate
+                </a>
+                <a href="{% url 'WinnerSelection' %}" class="btn" style="background-color: var(--success-color); min-width: 180px; margin-bottom: 15px;">
+                  <i class="fas fa-trophy fa-2x"></i><br>
+                  Winner Selection
+                </a>
+              </div>
+            </div>
+
+            <div class="card">
+              <img src="{% static 'images/images.jpg' %}" alt="Blockchain Technology" class="img-fluid" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;" />
+              <h3>TrustChain Officer Portal</h3>
+              <p>As a tender officer, you have full control over the tender management process. Create new tenders, evaluate submissions, and select winners with complete transparency and security.</p>
+            </div>
+          </div>
+        </div>
       </div>
-     
-       
-       
     </div>
-    
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
   </div>
 
 </body>

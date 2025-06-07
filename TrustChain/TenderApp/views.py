@@ -61,68 +61,156 @@ def Register(request):
 
 def BidTenderAction(request):
     if request.method == 'GET':
-        title = request.GET.get('title', False)
-        print(title+"================")
-        output = '<TR><TH align="left"><font size="" color="white">Tender&nbsp;Title<TD>&nbsp;&nbsp;<Input type=text name="t1" value='+title+'></TD></TR>'
-        context= {'data1':output}
+        # Get the tender title from the query parameters
+        # Remove any quotes that might be in the URL parameter
+        title = request.GET.get('title', '')
+        title = title.replace('"', '')
+        
+        # Create a properly formatted form input that works with our new form design
+        output = f'<input type="text" name="t1" id="tenderTitle" class="form-control" value="{title}" readonly>'
+        
+        context = {
+            'data1': output,
+            'title': title  # Pass the raw title separately in case we need it
+        }
+        
         return render(request, 'BidTenderAction.html', context)
         
         
 def BidTender(request):
     if request.method == 'GET':
-        color = '<font size="" color="white">'
-        output='<table border=1 align=center>'
-        output+='<tr><th>'+color+'Tender Title</th><th>'+color+'Tender Description</th><th>'+color+'Open Date</th><th>'+color+'Close Date</th><th>'+color+'Amount</th><th>'+color+'Bid Now</th></tr>'
-        current = datetime.now()
-        current = int(round(current.timestamp()))
+        # Use modern table styling that works with our CSS
+        output = '<table class="table table-striped">'
+        output += '<thead><tr><th>Tender Title</th><th>Tender Description</th><th>Open Date</th><th>Close Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>'
+        
+        current_date = datetime.now()
+        current = int(round(current_date.timestamp()))
+        found_tenders = False
+        
+        # For debugging - keep track of tenders and why they're filtered out
+        all_tenders = 0
+        filtered_tenders = 0
+        
         for i in range(len(blockchain.chain)):
             if i > 0:
-                b = blockchain.chain[i]
-                data = b.transactions[0]
-                data = base64.b64decode(data)
-                data = str(decrypt(data))
-                data = data[2:len(data)-1]
-                print(data)
-                arr = data.split("#")
-                # print(arr[0])
-                # print(arr[1])
-                if arr[0] == "tender" and getWinner(arr[1]) == 'none':
-                    open_date = arr[3]
-                    close_date = arr[4]
-                    # print(close_date)
-                    open_date = datetime.strptime(open_date, "%d-%m-%Y")
-                    close_date = datetime.strptime(close_date, "%d-%m-%Y")
-                    open_date = int(round(open_date.timestamp()))
-                    close_date = int(round(close_date.timestamp()))
-                   
-                    if current <= open_date and current <= close_date and getWinner(arr[1]) == "none":
-                        print("scxxxxxxxxxxxxx")
-                        output+='<tr><td>'+color+arr[1]+'</td><td>'+color+arr[2]+'</td><td>'+color+arr[3]+'</td><td>'+color+arr[4]+'</td><td>'+color+arr[5]+'</td>'
-                        output+='<td><a href=\'BidTenderAction?title="'+str(arr[1])+'"\'>'+color+'Click Here</font></a></td>'
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
                     
-        context= {'data':output}
+                    arr = data.split("#")
+                    if arr[0] == "tender":
+                        all_tenders += 1
+                        # Important: Check if this tender already has a winner
+                        winner_status = getWinner(arr[1])
+                        
+                        if winner_status == "none":
+                            # Try different date formats since the form might submit in various formats
+                            date_formats = ["%d-%m-%Y", "%d/%m/%Y"]
+                            open_date_parsed = None
+                            close_date_parsed = None
+                            
+                            for fmt in date_formats:
+                                try:
+                                    open_date_parsed = datetime.strptime(arr[3], fmt)
+                                    close_date_parsed = datetime.strptime(arr[4], fmt)
+                                    break
+                                except ValueError:
+                                    continue
+                            
+                            # If we couldn't parse the dates with any format, skip this tender
+                            if not open_date_parsed or not close_date_parsed:
+                                continue
+                            
+                            # REMOVED the timestamp comparison to show all available tenders
+                            # We'll display all tenders that don't have a winner yet
+                            found_tenders = True
+                            output += f'<tr><td>{arr[1]}</td><td>{arr[2]}</td><td>{arr[3]}</td><td>{arr[4]}</td><td>{arr[5]}</td>'
+                            # Fix the URL formatting to properly handle the title parameter
+                            output += f'<td><a href="BidTenderAction?title={arr[1]}" class="btn btn-sm"><i class="fas fa-gavel"></i> Bid Now</a></td></tr>'
+                except Exception as e:
+                    # Log exception but continue processing other blocks
+                    print(f"Error processing block {i}: {str(e)}")
+                    pass
+        
+        output += '</tbody></table>'
+        
+        # Only set the output if tenders were found
+        if not found_tenders:
+            output = ''
+            
+        context = {
+            'data': output,
+            'debug_info': f"Total tenders found: {all_tenders}, Filtered: {filtered_tenders}"
+        }
         return render(request, 'BidTender.html', context)
 
 
 def ViewTender(request):
     if request.method == 'GET':
-        color = '<font size="" color="white">'
-        output='<table border=1 align=center>'
-        output+='<tr><th><font size="" color="white">Tender Title</th><th><font size="" color="white">Amount</th><th><font size="" color="white">Username</th><th><font size="" color="white">Tender Status</th></tr>'
-        color = '<font size="" color="white">'
+        # Get current user from session
+        current_user = ''
+        try:
+            with open("session.txt", "r") as file:
+                for line in file:
+                    current_user = line.strip('\n')
+            file.close()
+        except:
+            pass
+            
+        # Use modern table styling that works with our CSS
+        output = '<table class="table table-striped">'
+        output += '<thead><tr><th>Tender Title</th><th>Amount</th><th>Username</th><th>Status</th></tr></thead><tbody>'
+        
+        bids_found = False
+        user_bids = {}
+        
+        # First pass: collect all biddings by the current user to avoid redundant blockchain scanning
         for i in range(len(blockchain.chain)):
             if i > 0:
-                b = blockchain.chain[i]
-                data = b.transactions[0]
-                data = base64.b64decode(data)
-                data = str(decrypt(data))
-                data = data[2:len(data)-1]
-                print(data)
-                arr = data.split("#")
-                if arr[0] == "bidding":
-                    output+='<tr><td>'+color+arr[1]+'</td><td>'+color+arr[2]+'</td><td>'+color+arr[3]+'</td><td>'+color+getWinners(arr[1],arr[3])+'</td>'
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
                     
-        context= {'data':output}
+                    if arr[0] == "bidding" and arr[3] == current_user:
+                        bids_found = True
+                        tender_title = arr[1]
+                        
+                        if tender_title not in user_bids:
+                            user_bids[tender_title] = {
+                                'amount': arr[2],
+                                'status': getWinners(arr[1], arr[3])
+                            }
+                except Exception as e:
+                    # Skip any entries with parsing issues
+                    pass
+        
+        # Generate table rows from the collected data
+        for title, bid_info in user_bids.items():
+            status = bid_info['status']
+            status_class = 'success' if status == 'Winner' else 'warning'
+            status_icon = 'trophy' if status == 'Winner' else 'hourglass'
+            
+            output += f'<tr>'
+            output += f'<td>{title}</td>'
+            output += f'<td>{bid_info["amount"]}</td>'
+            output += f'<td>{current_user}</td>'
+            output += f'<td><span class="badge badge-{status_class}"><i class="fas fa-{status_icon}"></i> {status}</span></td>'
+            output += f'</tr>'
+        
+        output += '</tbody></table>'
+        
+        # If no bids were found, return empty string to trigger the empty state in template
+        if not bids_found:
+            output = ''
+            
+        context = {'data': output}
         return render(request, 'ViewTender.html', context)
 
 def getWinner(title):
@@ -158,107 +246,239 @@ def getWinners(title, bidder):
 
 def EvaluateTender(request):
     if request.method == 'GET':
-        color = '<font size="" color="white">'
-        output='<table border=1 align=center>'
-        output+='<tr><th><font size="" color="white">Tender Title</th><th><font size="" color="white">Amount</th><th><font size="" color="white">Username</th><th><font size="" color="white">Winner Name</th></tr>'
-        color = '<font size="" color="white">'
-        titles = []
+        # Use modern table styling that works with our CSS
+        output = '<table class="table table-striped">'
+        output += '<thead><tr><th>Tender Title</th><th>Highest Bid</th><th>Bidder</th><th>Action</th></tr></thead><tbody>'
+        
+        # Create a dictionary to store tenders and their highest bids
+        # This reduces the need for multiple blockchain iterations
+        tender_data = {}
+        winner_data = {}
+        
+        # First pass - collect all relevant data
         for i in range(len(blockchain.chain)):
             if i > 0:
-                b = blockchain.chain[i]
-                data = b.transactions[0]
-                data = base64.b64decode(data)
-                data = str(decrypt(data))
-                data = data[2:len(data)-1]
-                arr = data.split("#")
-                print("lakshmi")
-                if arr[0] == "bidding" and arr[4] == "Pending":
-                    titles.append(arr[1])
-                    print("vamsi")
-
-        for k in range(len(titles)):
-            selected = 'none'
-            initial = 0
-            for i in range(len(blockchain.chain)):
-                if i > 0:
+                try:
                     b = blockchain.chain[i]
                     data = b.transactions[0]
                     data = base64.b64decode(data)
                     data = str(decrypt(data))
                     data = data[2:len(data)-1]
                     arr = data.split("#")
-                    if arr[0] == "bidding" and arr[4] == "Pending" and arr[1] == titles[k]:
-                        print("siri")
-                        print(arr[2])
-                        if float(arr[2]) > initial:
-                            initial = float(arr[2])
-                            selected = arr[3]
-                            print(selected)
-            if selected != 'none':
-                for i in range(len(blockchain.chain)):
-                    if i > 0:
-                        b = blockchain.chain[i]
-                        data = b.transactions[0]
-                        data = base64.b64decode(data)
-                        data = str(decrypt(data))
-                        data = data[2:len(data)-1]
-                        arr = data.split("#")
-                        print(arr)
-                        if arr[0] == "bidding" and arr[4] == "Pending" and arr[1] == titles[k] and getWinner(arr[1]) == 'none':
-                            data = "winner#"+arr[1]+"#"+arr[2]+"#"+arr[3]+"#"+selected
-                            enc = encrypt(str(data))
-                            enc = str(base64.b64encode(enc),'utf-8')
-                            blockchain.add_new_transaction(enc)
-                            hash = blockchain.mine()
-                            blockchain.save_object(blockchain,'blockchain_contract.txt')
+                    
+                    # Store winner information
+                    if arr[0] == "winner":
+                        winner_data[arr[1]] = arr[4]  # Store tender winner
+                        
+                    # Store bidding information for pending bids
+                    elif arr[0] == "bidding" and arr[4] == "Pending":
+                        tender_title = arr[1]
+                        bid_amount = float(arr[2])
+                        username = arr[3]
+                        
+                        # Skip tenders that already have winners
+                        if tender_title in winner_data:
+                            continue
+                            
+                        if tender_title not in tender_data:
+                            tender_data[tender_title] = {
+                                'highest_bid': bid_amount,
+                                'highest_bidder': username
+                            }
+                        elif bid_amount > tender_data[tender_title]['highest_bid']:
+                            tender_data[tender_title]['highest_bid'] = bid_amount
+                            tender_data[tender_title]['highest_bidder'] = username
+                except Exception as e:
+                    # Skip any entries with parsing issues
+                    continue
+        
+        # Generate table with evaluation options
+        found_tenders = False
+        for title, data in tender_data.items():
+            # Skip tenders that already have winners
+            if title in winner_data:
+                continue
                 
-        context= {'data':'Evaluation Process Completed'}
+            found_tenders = True
+            output += f'<tr>'
+            output += f'<td>{title}</td>'
+            output += f'<td>{data["highest_bid"]}</td>'
+            output += f'<td>{data["highest_bidder"]}</td>'
+            button_data = f"winner#{title}#{data['highest_bid']}#{title}#{data['highest_bidder']}"
+            output += f'<td><button onclick="selectWinner(\'{button_data}\')" class="btn btn-sm btn-success"><i class="fas fa-crown"></i> Select Winner</button></td>'
+            output += f'</tr>'
+        
+        output += '</tbody></table>'
+        
+        # Include JavaScript to handle winner selection
+        output += '''
+        <script>
+        function selectWinner(winnerData) {
+            if (confirm("Are you sure you want to select this bidder as the winner? This action cannot be undone.")) {
+                // Create a form to submit the winner data
+                var form = document.createElement("form");
+                form.setAttribute("method", "post");
+                form.setAttribute("action", "evaluateWinner");
+                
+                var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                var csrfInput = document.createElement("input");
+                csrfInput.setAttribute("type", "hidden");
+                csrfInput.setAttribute("name", "csrfmiddlewaretoken");
+                csrfInput.setAttribute("value", csrfToken);
+                form.appendChild(csrfInput);
+                
+                var hiddenField = document.createElement("input");
+                hiddenField.setAttribute("type", "hidden");
+                hiddenField.setAttribute("name", "winner_data");
+                hiddenField.setAttribute("value", winnerData);
+                form.appendChild(hiddenField);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        </script>
+        '''
+        
+        # If no tenders found for evaluation, show empty state
+        if not found_tenders:
+            output = ''
+        
+        # Process automatic winner selection (legacy behavior)
+        # This selects winners automatically without user interaction
+        # We'll preserve this behavior to maintain compatibility
+        for title, data in tender_data.items():
+            # Skip tenders that already have winners
+            if title in winner_data:
+                continue
+                
+            # Create winner transaction
+            winner_data = "winner#" + title + "#" + str(data["highest_bid"]) + "#" + title + "#" + data["highest_bidder"]
+            enc = encrypt(str(winner_data))
+            enc = str(base64.b64encode(enc), 'utf-8')
+            blockchain.add_new_transaction(enc)
+            hash = blockchain.mine()
+            blockchain.save_object(blockchain, 'blockchain_contract.txt')
+        
+        context= {'data': output}
         return render(request, 'EvaluateTender.html', context)                                    
                     
        
 
 def WinnerSelection(request):
     if request.method == 'GET':
-        color = '<font size="" color="white">'
-        output='<table border=1 align=center>'
-        output+='<tr><th><font size="" color="white">Tender Title</th><th><font size="" color="white">Amount</th><th><font size="" color="white">Username</th><th><font size="" color="white">Win Status</th></tr>'
-        color = '<font size="" color="white">'
+        # Use modern table styling that works with our CSS
+        output = '<table class="table table-striped">'
+        output += '<thead><tr><th>Tender Title</th><th>Amount</th><th>Winner</th><th>Status</th></tr></thead><tbody>'
+        
+        # Dictionary to store winning bids
+        winners = {}
+        
+        # First pass: collect all winner information 
         for i in range(len(blockchain.chain)):
             if i > 0:
-                b = blockchain.chain[i]
-                print(b)
-                data = b.transactions[0]
-                data = base64.b64decode(data)
-                data = str(decrypt(data))
-                data = data[2:len(data)-1]
-                print(data)
-                arr = data.split("#")
-                if arr[0] == "bidding":
-                    output+='<tr><td>'+color+arr[1]+'</td><td>'+color+arr[2]+'</td><td>'+color+arr[3]+'</td><td>'+color+getWinners(arr[1],arr[3])+'</td>'
-        context= {'data':output}
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    # Record winner information
+                    if arr[0] == "winner":
+                        tender_title = arr[1]
+                        bid_amount = arr[2]
+                        username = arr[4]
+                        
+                        winners[tender_title] = {
+                            'amount': bid_amount,
+                            'username': username
+                        }
+                except Exception as e:
+                    # Skip any entries with parsing issues
+                    pass
+        
+        # Generate table with winners
+        found_winners = False
+        for title, data in winners.items():
+            found_winners = True
+            output += f'<tr>'
+            output += f'<td>{title}</td>'
+            output += f'<td>{data["amount"]}</td>'
+            output += f'<td>{data["username"]}</td>'
+            output += f'<td><span class="badge badge-success"><i class="fas fa-trophy"></i> Winner Selected</span></td>'
+            output += f'</tr>'
+        
+        output += '</tbody></table>'
+        
+        # If no winners found, return empty string to trigger the empty state in template
+        if not found_winners:
+            output = ''
+            
+        context = {'data': output}
         return render(request, 'WinnerSelection.html', context)                    
 
 def BidTenderActionPage(request):
     if request.method == 'POST':
-        title = request.POST.get('t1', False)
-        amt = request.POST.get('t2', False)
-        user = ''
-        with open("session.txt", "r") as file:
-          for line in file:
-              user = line.strip('\n')
-        file.close()
-        data = "bidding#"+title+"#"+amt+"#"+user+"#Pending"
-        enc = encrypt(str(data))
-        enc = str(base64.b64encode(enc),'utf-8')
-        blockchain.add_new_transaction(enc)
-        hash = blockchain.mine()
-        b = blockchain.chain[len(blockchain.chain)-1]
-        print("Previous Hash : "+str(b.previous_hash)+" Block No : "+str(b.index)+" Current Hash : "+str(b.hash))
-        bc = "Previous Hash : "+str(b.previous_hash)+"<br/>Block No : "+str(b.index)+"<br/>Current Hash : "+str(b.hash)
-        blockchain.save_object(blockchain,'blockchain_contract.txt')
-        context= {'data':'Bidding Submitted Successfully.<br/>'+bc}
-        return render(request, 'BidderScreen.html', context)
-              
+        try:
+            # Get form data
+            title = request.POST.get('t1', '')
+            amount = request.POST.get('t2', '')
+            
+            # Strip any unnecessary quotes or spaces
+            title = title.strip().replace('"', '')
+            amount = amount.strip()
+            
+            # Validate amount is a valid number
+            try:
+                float_amount = float(amount)
+                if float_amount <= 0:
+                    context = {'data': 'Invalid bid amount. Please enter a positive number.'}
+                    return render(request, 'BidTenderAction.html', context)
+            except ValueError:
+                context = {'data': 'Invalid bid amount. Please enter a valid number.'}
+                return render(request, 'BidTenderAction.html', context)
+            
+            # Get current user from session
+            user = ''
+            try:
+                with open("session.txt", "r") as file:
+                    for line in file:
+                        user = line.strip('\n')
+                        break  # Only read the first line
+                    file.close()
+            except Exception as e:
+                context = {'data': 'Error retrieving user session. Please log in again.'}
+                return render(request, 'BidTenderAction.html', context)
+            
+            if not user:
+                context = {'data': 'User session expired. Please log in again.'}
+                return render(request, 'BidTenderAction.html', context)
+                
+            # Create the bid data and encrypt it
+            data = f"bidding#{title}#{amount}#{user}#Pending"
+            
+            # Add to blockchain
+            try:
+                enc = encrypt(str(data))
+                enc = str(base64.b64encode(enc),'utf-8')
+                blockchain.add_new_transaction(enc)
+                hash = blockchain.mine()
+                blockchain.save_object(blockchain,'blockchain_contract.txt')
+                
+                context = {
+                    'data': f'Your bid for <strong>{title}</strong> has been successfully submitted.',
+                    'success': True
+                }
+            except Exception as e:
+                context = {'data': f'Error submitting bid: {str(e)}'}
+                
+            return render(request, 'BidTenderAction.html', context)
+            
+        except Exception as e:
+            context = {'data': f'An unexpected error occurred: {str(e)}'}
+            return render(request, 'BidTenderAction.html', context)
 
 def checkUser(username):
     record = 'none'

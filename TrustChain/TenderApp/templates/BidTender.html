@@ -1,51 +1,73 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Bid on Tenders</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-    <ul>
-      <li><a href="{% url 'BidTender' %}">Bid Tender</a></li>
-      <li><a href="{% url 'ViewTender' %}">View Tender Status</a></li>
-	  <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li class="current_page_item"><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
+        <li><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
   <div id="page">
-   <div id="content">
-      <div class="post">
-        <div class="title">
-          <h2>Smart Tender/Contract Management System Using Blockchain</h2>
-         </div>
-        <div class="entry">
-		 <br/><br/><br/>
-	 
-	 <br>
-          <p><img src="{% static 'images/images.jpg' %}" alt="" width="890" height="200" class="left" /><p></p><font size="4" color="white">
-
-		  {{ data|safe }}
-          
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-gavel"></i> Bid on Available Tenders</h2>
           </div>
-        
+          <div class="entry">
+            <div class="card">
+              {{ data|safe }}
+            </div>
+            
+            {% if not data %}
+            <div class="card info-card">
+              <i class="fas fa-info-circle fa-3x" style="color: var(--primary-color); margin-bottom: 1rem;"></i>
+              <h3>No Active Tenders</h3>
+              <p>There are currently no active tenders available for bidding. Please check back later or contact the tender officer for more information.</p>
+            </div>
+            {% endif %}
+            
+            <div class="card">
+              <img src="{% static 'images/images.jpg' %}" alt="Blockchain Technology" class="img-fluid" style="width: 100%; max-height: 300px; object-fit: cover; border-radius: 6px; margin-bottom: 1rem;" />
+              <h3>Bidding with TrustChain</h3>
+              <p>Our blockchain-based system ensures transparency and security in the bidding process. Your bids are cryptographically secured and cannot be tampered with, providing a fair opportunity for all participants.</p>
+              <div class="alert alert-info">
+                <i class="fas fa-lightbulb"></i> <strong>Tip:</strong> Make sure to review all tender details carefully before submitting your bid to ensure compliance with all requirements.  
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-     
-       <br/><br/><br/><br/><br/><br/>
-       
     </div>
-    
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
   </div>
 
 </body>

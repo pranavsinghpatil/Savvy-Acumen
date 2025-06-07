@@ -1,71 +1,123 @@
 {% load static %}
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<title>Smart Tender/Contract Management System Using Blockchain</title>
+<title>TrustChain - Submit Bid</title>
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
-<link href="{% static 'default.css' %}" rel="stylesheet" type="text/css" media="screen" />
- <script LANGUAGE="Javascript" >
-function validate(){
-	var x=document.forms["f1"]["username"].value;
-	var y=document.forms["f1"]["password"].value;
-	if(x == null || x==""){
-		window.alert("Username must be enter");
-		document.f1.t1.focus();
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+<script type="text/javascript">
+function validateBid() {
+	var bidAmount = document.forms["bidForm"]["t2"].value;
+	
+	if(bidAmount === null || bidAmount.trim() === "") {
+		alert("Please enter a bid amount");
+		document.bidForm.t2.focus();
 		return false;
 	}
-	if(y == null || y==""){
-		window.alert("Password must be enter");
-		document.f1.t2.focus();
+	
+	// Check if bid amount is a valid number
+	if(isNaN(bidAmount) || parseFloat(bidAmount) <= 0) {
+		alert("Please enter a valid positive number for the bid amount");
+		document.bidForm.t2.focus();
 		return false;
 	}
+	
 	return true;
 }
-		
-	
-	</script>
+</script>
 </head>
 <body>
 <div id="wrapper">
   <div id="header">
-    <div id="logo">
-      <h1><font color="orange" size=6>Smart Tender/Contract Management System Using Blockchain</font></h1>
-	  <marquee><font color="pink" size=4>Smart Tender/Contract Management System Using Blockchain</font></marquee>
-    </div>
-   
-  
+    <div class="container">
+      <div class="logo-container">
+        <div class="logo">
+          <h1><i class="fas fa-link"></i> TrustChain</h1>
+          <p>Secure Blockchain-based Tender Management</p>
+        </div>
+      </div>
     </div>
   </div>
   <div id="menu">
-     <ul>
-      <li><a href="{% url 'BidTender' %}">Bid Tender</a></li>
-      <li><a href="{% url 'ViewTender' %}">View Tender Status</a></li>
-	  <li><a href="{% url 'index' %}">Logout</a></li>
-      
-   </ul>
+    <div class="container">
+      <ul>
+        <li class="current_page_item"><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
+        <li><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
+      </ul>
+    </div>
   </div>
-  <div class="entry">
-   <br/><br/><br/>
-	<font size="" color="white"><center>{{ data }}</center></font>
-	 <br>
-	 <center><font size="3" color="white">Bid Tender Screen</font></center>
-	<form name="f1" method="post" action={% url 'BidTenderActionPage' %} OnSubmit="return validate()">
-	{% csrf_token %}
-	<br><br>
-	<TABLE align=center width="35%" class="notepad">
-		{{ data1|safe }}
-		
-		<TR><TH align="left"><font size="" color="white">Bid&nbsp;Amount
-		<TD>&nbsp;&nbsp;<Input type='text' name="t2"  value='' class="form-control">
-		</TR>
-		  <TR>
-				 <TD></TD>
-			<TD>	
-		  <input type="submit" value="Submit">
-		 
-		  </TABLE>
-		
-</form>
-</div>
+  <div id="page">
+    <div class="container">
+      <div id="content">
+        <div class="post">
+          <div class="title">
+            <h2><i class="fas fa-gavel"></i> Submit Your Bid</h2>
+          </div>
+          <div class="entry">
+            {% if data %}
+            <div class="alert alert-info">
+              {{ data }}
+            </div>
+            {% endif %}
+            
+            <div class="card">
+              <div class="card-title">
+                <h3>Bid Details</h3>
+              </div>
+              
+              <form name="bidForm" id="bidForm" method="post" action="{% url 'BidTenderActionPage' %}" onsubmit="return validateBid()">
+                {% csrf_token %}
+                
+                <div class="form-group">
+                  <label for="tenderTitle"><i class="fas fa-file-contract"></i> Tender Title</label>
+                  {% if data1 %}
+                    {{ data1|safe }}
+                  {% else %}
+                    <input type="text" name="t1" id="tenderTitle" class="form-control" readonly>
+                  {% endif %}
+                </div>
+                
+                <div class="form-group">
+                  <label for="bidAmount"><i class="fas fa-coins"></i> Bid Amount</label>
+                  <input type="text" name="t2" id="bidAmount" class="form-control" placeholder="Enter your bid amount" required>
+                  <small class="form-text">Enter your best bid amount. This will be recorded on the blockchain and cannot be modified later.</small>
+                </div>
+                
+                <div class="text-center">
+                  <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Submit Bid</button>
+                  <a href="{% url 'BidTender' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Tenders</a>
+                </div>
+              </form>
+            </div>
+            
+            <div class="card">
+              <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle"></i> <strong>Important:</strong> Once submitted, your bid will be stored on the blockchain and cannot be altered.
+              </div>
+              
+              <h4>Bidding Guidelines</h4>
+              <ul class="feature-list">
+                <li><i class="fas fa-check-circle"></i> Ensure your bid is accurate before submission</li>
+                <li><i class="fas fa-check-circle"></i> All bids are recorded with a timestamp on the blockchain</li>
+                <li><i class="fas fa-check-circle"></i> Bid evaluation is done transparently through smart contracts</li>
+                <li><i class="fas fa-check-circle"></i> You will be notified of the outcome in the "View Tender Status" section</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="footer">
+    <div class="container">
+      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
+      <p>Secure • Transparent • Efficient</p>
+    </div>
+  </div>
 
 </body>
 </html>
