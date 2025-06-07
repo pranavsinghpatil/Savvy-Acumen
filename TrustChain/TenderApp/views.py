@@ -1,5 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.template import RequestContext
+
+def TenderScreen(request):
+    if request.method == 'GET':
+        return render(request, 'TenderScreen.html', {})
+
 from django.contrib import messages
 from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
@@ -38,6 +43,209 @@ def decrypt(enc): #AES data decryption
 def CreateTender(request):
     if request.method == 'GET':
        return render(request, 'CreateTender.html', {})
+
+def OfficerOngoingTenders(request):
+    from datetime import datetime
+    tenders = []
+    closed_tenders = []
+    winner_titles = set()
+    winner_info = {}
+    debug_log = []
+    now = datetime.now()
+    debug_log.append(f"Current server time: {now}")
+    
+    # Collect all winner titles and their info
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            b = blockchain.chain[i]
+            data = b.transactions[0]
+            data = base64.b64decode(data)
+            data = str(decrypt(data))
+            data = data[2:len(data)-1]
+            arr = data.split("#")
+            if arr[0] == "winner":
+                tender_title = arr[1]
+                winner_titles.add(tender_title)
+                # Store bidder name and amount if available
+                # Parse the winner information correctly
+                if len(arr) >= 4:
+                    # Format the amount properly (handle large numbers)
+                    try:
+                        amount = float(arr[2])
+                        if amount > 1000000000:  # If over a billion
+                            formatted_amount = f"{amount:.2f}".rstrip('0').rstrip('.')
+                        else:
+                            formatted_amount = arr[2]
+                    except ValueError:
+                        formatted_amount = arr[2]
+                        
+                    winner_info[tender_title] = {
+                        'bidder': arr[3],     # Winner name is in position 3
+                        'amount': formatted_amount  # Amount is in position 2, with better formatting
+                    }
+                else:
+                    winner_info[tender_title] = {
+                        'bidder': 'Selected',
+                        'amount': 'Not recorded'
+                    }
+    debug_log.append(f"Winner titles: {winner_titles}")
+    debug_log.append(f"Winner info: {winner_info}")
+
+    # Collect ongoing tenders
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            b = blockchain.chain[i]
+            data = b.transactions[0]
+            data = base64.b64decode(data)
+            data = str(decrypt(data))
+            data = data[2:len(data)-1]
+            arr = data.split("#")
+            if arr[0] == "tender":
+                title = arr[1]
+                description = arr[2]
+                open_date = arr[3]
+                close_date = arr[4]
+                amount = arr[5]
+                open_dt = None
+                close_dt = None
+                open_fmt = close_fmt = None
+                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                    try:
+                        open_dt = datetime.strptime(open_date, fmt)
+                        open_fmt = fmt
+                        break
+                    except Exception:
+                        continue
+                if open_dt is None:
+                    debug_log.append(f"[ERROR] Could not parse open_date: {open_date} for tender '{title}'")
+                    continue
+                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                    try:
+                        close_dt = datetime.strptime(close_date, fmt)
+                        close_fmt = fmt
+                        break
+                    except Exception:
+                        continue
+                if close_dt is None:
+                    debug_log.append(f"[ERROR] Could not parse close_date: {close_date} for tender '{title}'")
+                    continue
+                # For closed or awarded tenders
+                tender_data = {
+                    'title': title,
+                    'description': description,
+                    'open_date': open_date,
+                    'close_date': close_date,
+                    'amount': amount
+                }
+                
+                # Check if it's an awarded tender
+                if title in winner_titles:
+                    debug_log.append(f"Tender '{title}' has a winner - adding to closed tenders list.")
+                    tender_data['status'] = 'Awarded'
+                    tender_data['winner'] = winner_info.get(title, {}).get('bidder', 'Selected')
+                    tender_data['winning_amount'] = winner_info.get(title, {}).get('amount', 'Not recorded')
+                    closed_tenders.append(tender_data)
+                    continue
+                    
+                # Check if it's a closed tender without winner
+                if close_dt < now:
+                    debug_log.append(f"Tender '{title}' is closed (close_date: {close_date}, parsed: {close_dt}, now: {now}).")  
+                    tender_data['status'] = 'Closed'
+                    closed_tenders.append(tender_data)
+                    continue
+                
+                # Add a flag to indicate if the tender is not yet open but still viewable
+                is_future = open_dt > now
+                tenders.append({
+                    'title': title,
+                    'description': description,
+                    'open_date': open_date,
+                    'close_date': close_date,
+                    'amount': amount,
+                    'is_future': is_future
+                })
+                debug_log.append(f"Tender '{title}' added: open_date {open_date} ({open_fmt}), close_date {close_date} ({close_fmt}).")
+    debug_log.append(f"Total ongoing tenders found: {len(tenders)}")
+    debug_log.append(f"Total closed/awarded tenders found: {len(closed_tenders)}")
+    context = {
+        'tenders': tenders, 
+        'closed_tenders': closed_tenders,
+        'debug_log': debug_log
+    }
+    return render(request, 'OfficerOngoingTenders.html', context)
+
+
+def EditTender(request, tender_title):
+    # If the form is submitted (POST request), update the tender
+    if request.method == 'POST':
+        title = request.POST.get('title', '')
+        description = request.POST.get('description', '')
+        open_date = request.POST.get('open_date', '')
+        close_date = request.POST.get('close_date', '')
+        amount = request.POST.get('amount', '')
+        
+        # Delete the old tender and add a new one
+        # Since blockchain can't be directly edited, we need to mark old tender as deleted
+        # and add a new one with updated details
+        
+        # First, add a transaction marking the old tender as deleted
+        data = f"delete_tender#{tender_title}"
+        data_encoded = str(base64.b64encode(encrypt(str(data))),'utf-8')
+        blockchain.add_new_transaction(data_encoded)
+        hash = blockchain.mine()
+        
+        # Then, add the new updated tender
+        data = f"tender#{title}#{description}#{open_date}#{close_date}#{amount}"
+        data_encoded = str(base64.b64encode(encrypt(str(data))),'utf-8')
+        blockchain.add_new_transaction(data_encoded)
+        hash = blockchain.mine()
+        
+        # Redirect back to ongoing tenders page
+        return redirect('OfficerOngoingTenders')
+    
+    # GET request - show the edit form with current tender details
+    tender_data = None
+    # Search for this tender in the blockchain
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            b = blockchain.chain[i]
+            data = b.transactions[0]
+            data = base64.b64decode(data)
+            data = str(decrypt(data))
+            data = data[2:len(data)-1]
+            arr = data.split("#")
+            if arr[0] == "tender" and arr[1] == tender_title:
+                tender_data = {
+                    'title': arr[1],
+                    'description': arr[2],
+                    'open_date': arr[3],
+                    'close_date': arr[4],
+                    'amount': arr[5]
+                }
+                break
+    
+    if tender_data is None:
+        # Tender not found
+        return redirect('OfficerOngoingTenders')
+    
+    context = {'tender': tender_data}
+    return render(request, 'EditTender.html', context)
+
+
+def DeleteTender(request):
+    # Get the title from the query parameters
+    tender_title = request.GET.get('title', '')
+    
+    if tender_title:
+        # Add a transaction marking the tender as deleted
+        data = f"delete_tender#{tender_title}"
+        data_encoded = str(base64.b64encode(encrypt(str(data))),'utf-8')
+        blockchain.add_new_transaction(data_encoded)
+        hash = blockchain.mine()
+    
+    # Redirect back to ongoing tenders page
+    return redirect('OfficerOngoingTenders')
+
 
 def index(request):
     if request.method == 'GET':
@@ -128,8 +336,8 @@ def BidTender(request):
                             # We'll display all tenders that don't have a winner yet
                             found_tenders = True
                             output += f'<tr><td>{arr[1]}</td><td>{arr[2]}</td><td>{arr[3]}</td><td>{arr[4]}</td><td>{arr[5]}</td>'
-                            # Fix the URL formatting to properly handle the title parameter
-                            output += f'<td><a href="BidTenderAction?title={arr[1]}" class="btn btn-sm"><i class="fas fa-gavel"></i> Bid Now</a></td></tr>'
+                            # Improved button styling for better visibility
+                            output += f'<td><a href="BidTenderAction?title={arr[1]}" class="btn btn-sm action-btn"><i class="fas fa-gavel"></i> Bid Now</a></td></tr>'
                 except Exception as e:
                     # Log exception but continue processing other blocks
                     print(f"Error processing block {i}: {str(e)}")
@@ -305,7 +513,7 @@ def EvaluateTender(request):
             output += f'<td>{data["highest_bid"]}</td>'
             output += f'<td>{data["highest_bidder"]}</td>'
             button_data = f"winner#{title}#{data['highest_bid']}#{title}#{data['highest_bidder']}"
-            output += f'<td><button onclick="selectWinner(\'{button_data}\')" class="btn btn-sm btn-success"><i class="fas fa-crown"></i> Select Winner</button></td>'
+            output += f'<td><button onclick="selectWinner(\'{button_data}\')" class="btn btn-sm btn-success action-btn"><i class="fas fa-crown"></i> Select Winner</button></td>'
             output += f'</tr>'
         
         output += '</tbody></table>'

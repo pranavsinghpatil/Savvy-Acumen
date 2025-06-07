@@ -23,6 +23,8 @@
   <div id="menu">
     <div class="container">
       <ul>
+        <li><a href="{% url 'TenderScreen' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+        <li><a href="{% url 'OfficerOngoingTenders' %}"><i class="fas fa-stream" style="color:#18c964;"></i> Ongoing Tenders</a></li>
         <li><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
         <li><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
         <li class="current_page_item"><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
@@ -35,7 +37,7 @@
       <div id="content">
         <div class="post">
           <div class="title">
-            <h2><i class="fas fa-trophy"></i> Winner Selection</h2>
+            <h2 style="color:#18c964;"><i class="fas fa-award"></i> Winner Selection</h2>
           </div>
           <div class="entry">
             <div class="card">
@@ -49,7 +51,7 @@
                 <i class="fas fa-info-circle fa-3x" style="color: var(--primary-color); margin-bottom: 1rem;"></i>
                 <h4>No Evaluated Tenders Available</h4>
                 <p>There are currently no evaluated tenders ready for winner selection. Please evaluate tenders first.</p>
-                <a href="{% url 'EvaluateTender' %}" class="btn"><i class="fas fa-tasks"></i> Go to Evaluation</a>
+                <a href="{% url 'EvaluateTender' %}" class="btn action-btn"><i class="fas fa-tasks"></i> Go to Evaluation</a>
               </div>
               {% endif %}
             </div>

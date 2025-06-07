@@ -61,7 +61,10 @@ function validate(){
   <div id="menu">
     <div class="container">
       <ul>
+        <li><a href="{% url 'TenderScreen' %}"><i class="fas fa-th-large"></i> Dashboard</a></li>
+        <li><a href="{% url 'OfficerOngoingTenders' %}"><i class="fas fa-stream" style="color:#18c964;"></i> Ongoing Tenders</a></li>
         <li class="current_page_item"><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
+
         <li><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
         <li><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
         <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
@@ -73,7 +76,7 @@ function validate(){
       <div id="content">
         <div class="post">
           <div class="title">
-            <h2><i class="fas fa-file-contract"></i> Create New Tender</h2>
+            <h2 style="color:#18c964;"><i class="fas fa-file-contract"></i> Create New Tender</h2>
           </div>
           <div class="entry">
             {% if data %}
@@ -103,11 +106,11 @@ function validate(){
                   <div class="form-group col-md-6">
                     <label for="demo"><i class="fas fa-calendar-plus"></i> Opening Date</label>
                     <div class="input-group">
-                      <input name="t3" type="text" id="demo" maxlength="25" placeholder="DD/MM/YYYY" class="form-control">
+                      <input name="t3" type="date" id="demo" class="modern-date-picker form-control">
                       <div class="input-group-append">
-                        <a href="javascript:NewCal('demo','ddmmyyyy',false,24)" class="btn btn-secondary">
-                          <img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date">
-                        </a>
+                        <button class="btn btn-success rounded-circle" type="button" onclick="NewCal('demo','ddmmyyyy',false,24)">
+                          <i class="fas fa-calendar-alt"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -115,11 +118,11 @@ function validate(){
                   <div class="form-group col-md-6">
                     <label for="demo1"><i class="fas fa-calendar-times"></i> Closing Date</label>
                     <div class="input-group">
-                      <input name="t4" type="text" id="demo1" maxlength="25" placeholder="DD/MM/YYYY" class="form-control">
+                      <input name="t4" type="date" id="demo1" class="modern-date-picker form-control">
                       <div class="input-group-append">
-                        <a href="javascript:NewCal('demo1','ddmmyyyy',false,24)" class="btn btn-secondary">
-                          <img src="{% static 'cal.gif' %}" width="16" height="16" border="0" alt="Pick a date">
-                        </a>
+                        <button class="btn btn-success rounded-circle" type="button" onclick="NewCal('demo1','ddmmyyyy',false,24)">
+                          <i class="fas fa-calendar-alt"></i>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -135,8 +138,8 @@ function validate(){
                   </div>
                 </div>
                 
-                <div class="text-center">
-                  <button type="submit" class="btn"><i class="fas fa-plus-circle"></i> Create Tender</button>
+                <div class="text-center button-group">
+                  <button type="submit" class="btn action-btn"><i class="fas fa-plus-circle"></i> Create Tender</button>
                 </div>
               </form>
             </div>

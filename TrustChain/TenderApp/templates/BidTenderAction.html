@@ -54,7 +54,7 @@ function validateBid() {
       <div id="content">
         <div class="post">
           <div class="title">
-            <h2><i class="fas fa-gavel"></i> Submit Your Bid</h2>
+            <h2 style="color:#18c964;"><i class="fas fa-gavel"></i> Submit Bid</h2>
           </div>
           <div class="entry">
             {% if data %}
@@ -86,9 +86,9 @@ function validateBid() {
                   <small class="form-text">Enter your best bid amount. This will be recorded on the blockchain and cannot be modified later.</small>
                 </div>
                 
-                <div class="text-center">
-                  <button type="submit" class="btn"><i class="fas fa-paper-plane"></i> Submit Bid</button>
-                  <a href="{% url 'BidTender' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Tenders</a>
+                <div class="text-center button-group">
+                  <button type="submit" class="btn action-btn"><i class="fas fa-paper-plane"></i> Submit Bid</button>
+                  <a href="{% url 'BidTender' %}" class="btn btn-secondary action-btn"><i class="fas fa-arrow-left"></i> Back to Tenders</a>
                 </div>
               </form>
             </div>
