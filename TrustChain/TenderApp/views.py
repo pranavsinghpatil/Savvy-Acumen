@@ -1116,6 +1116,13 @@ def get_cached_tenders(current_user):
                         tender_title in closed_tenders):
                         continue
                     
+                    # Check if user has already bid on this tender
+                    has_submitted_bid = tender_title in user_bids
+                    
+                    # Skip tenders that the bidder has already bid on as they shouldn't see them in the list
+                    if has_submitted_bid:
+                        continue
+                        
                     # Extract tender data
                     tender_data = {
                         'title': arr[1],
@@ -1126,7 +1133,7 @@ def get_cached_tenders(current_user):
                         'industry': arr[6],
                         'tender_type': arr[7] if len(arr) > 7 else 'General',
                         'created_by': arr[8] if len(arr) > 8 else 'Unknown',
-                        'has_submitted_bid': tender_title in user_bids
+                        'has_submitted_bid': has_submitted_bid
                     }
                     
                     # Check if the tender is active based on dates
@@ -1658,16 +1665,12 @@ def getWinners(title, bidder):
 
 def EvaluateTender(request):
     if request.method == 'GET':
-        # Use modern table styling that works with our CSS
-        output = '<table class="table table-striped">'
-        output += '<thead><tr><th>Tender Title</th><th>Highest Bid</th><th>Bidder</th><th>Action</th></tr></thead><tbody>'
-        
-        # Create a dictionary to store tenders and their highest bids
-        # This reduces the need for multiple blockchain iterations
-        tender_data = {}
+        # Dictionary to store tenders and all their bids with complete details
+        all_tenders = {}
         winner_data = {}
+        rejected_bids = {}
         
-        # First pass - collect all relevant data
+        # First pass - collect all relevant data including rejected bids
         for i in range(len(blockchain.chain)):
             if i > 0:
                 try:
@@ -1681,48 +1684,141 @@ def EvaluateTender(request):
                     # Store winner information
                     if arr[0] == "winner":
                         winner_data[arr[1]] = arr[4]  # Store tender winner
-                        
-                    # Store bidding information for pending bids
-                    elif arr[0] == "bidding" and arr[4] == "Pending":
+                    
+                    # Store rejected bid information
+                    elif arr[0] == "reject":
+                        tender_title = arr[1]
+                        username = arr[3]
+                        if tender_title not in rejected_bids:
+                            rejected_bids[tender_title] = []
+                        rejected_bids[tender_title].append(username)
+                    
+                    # Store all bidding information
+                    elif arr[0] == "bidding":
                         tender_title = arr[1]
                         bid_amount = float(arr[2])
                         username = arr[3]
+                        status = arr[4]  # Pending, Rejected etc.
                         
                         # Skip tenders that already have winners
                         if tender_title in winner_data:
                             continue
                             
-                        if tender_title not in tender_data:
-                            tender_data[tender_title] = {
-                                'highest_bid': bid_amount,
-                                'highest_bidder': username
-                            }
-                        elif bid_amount > tender_data[tender_title]['highest_bid']:
-                            tender_data[tender_title]['highest_bid'] = bid_amount
-                            tender_data[tender_title]['highest_bidder'] = username
+                        # Skip bids that are already processed (not Pending)
+                        if status != "Pending":
+                            continue
+                            
+                        # Skip rejected bids
+                        if tender_title in rejected_bids and username in rejected_bids[tender_title]:
+                            continue
+                        
+                        # Additional bid details (might be in different positions depending on schema)
+                        company_name = arr[5] if len(arr) > 5 else "Not specified"
+                        contact_person = arr[6] if len(arr) > 6 else "Not specified"
+                        email = arr[7] if len(arr) > 7 else "Not specified"
+                        phone = arr[8] if len(arr) > 8 else "Not specified"
+                        completion_days = arr[9] if len(arr) > 9 else "Not specified"
+                        proposal_summary = arr[10] if len(arr) > 10 else "Not specified"
+                        experience = arr[11] if len(arr) > 11 else "Not specified"
+                        
+                        # Store bid with complete details
+                        if tender_title not in all_tenders:
+                            all_tenders[tender_title] = []
+                            
+                        all_tenders[tender_title].append({
+                            'bid_amount': bid_amount,
+                            'username': username,
+                            'company_name': company_name,
+                            'contact_person': contact_person,
+                            'email': email,
+                            'phone': phone,
+                            'completion_days': completion_days,
+                            'proposal_summary': proposal_summary,
+                            'experience': experience,
+                            'timestamp': b.timestamp  # Include timestamp for sorting
+                        })
                 except Exception as e:
                     # Skip any entries with parsing issues
                     continue
         
-        # Generate table with evaluation options
+        # Sort bids for each tender by timestamp (newest first)
+        for title in all_tenders:
+            all_tenders[title].sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        # Build HTML for each tender with all its bids
+        output = ''
         found_tenders = False
-        for title, data in tender_data.items():
-            # Skip tenders that already have winners
-            if title in winner_data:
+        
+        for title, bids in all_tenders.items():
+            if not bids:  # Skip tenders with no bids
                 continue
                 
             found_tenders = True
-            output += f'<tr>'
-            output += f'<td>{title}</td>'
-            output += f'<td>{data["highest_bid"]}</td>'
-            output += f'<td>{data["highest_bidder"]}</td>'
-            button_data = f"winner#{title}#{data['highest_bid']}#{title}#{data['highest_bidder']}"
-            output += f'<td><button onclick="selectWinner(\'{button_data}\')" class="btn btn-sm btn-success action-btn"><i class="fas fa-crown"></i> Select Winner</button></td>'
-            output += f'</tr>'
+            
+            # Create a card for each tender
+            output += f'''
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">{title}</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bid Amount</th>
+                                <th>Company</th>
+                                <th>Contact Person</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th>Days to Complete</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            '''
+            
+            # Add rows for each bid
+            for bid in bids:
+                # Generate data strings for action buttons
+                reject_data = f"reject#{title}#{bid['bid_amount']}#{bid['username']}"
+                winner_data = f"winner#{title}#{bid['bid_amount']}#{title}#{bid['username']}"
+                
+                output += f'''
+                <tr>
+                    <td>{bid['bid_amount']}</td>
+                    <td>{bid['company_name']}</td>
+                    <td>{bid['contact_person']}</td>
+                    <td>{bid['email']}</td>
+                    <td>{bid['phone']}</td>
+                    <td>{bid['completion_days']}</td>
+                    <td>
+                        <div class="btn-group">
+                            <button onclick="selectWinner('{winner_data}')" class="btn btn-sm btn-success"><i class="fas fa-crown"></i> Select Winner</button>
+                            <button onclick="rejectBid('{reject_data}')" class="btn btn-sm btn-danger"><i class="fas fa-times"></i> Reject</button>
+                            <button type="button" class="btn btn-sm btn-info" data-toggle="collapse" data-target="#details-{title.replace(' ', '_')}-{bid['username'].replace(' ', '_')}"><i class="fas fa-info-circle"></i> Details</button>
+                        </div>
+                    </td>
+                </tr>
+                <tr class="collapse" id="details-{title.replace(' ', '_')}-{bid['username'].replace(' ', '_')}">
+                    <td colspan="7">
+                        <div class="card card-body">
+                            <h6>Proposal Summary:</h6>
+                            <p>{bid['proposal_summary']}</p>
+                            <h6>Experience:</h6>
+                            <p>{bid['experience']}</p>
+                        </div>
+                    </td>
+                </tr>
+                '''
+                
+            output += '''
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            '''
         
-        output += '</tbody></table>'
-        
-        # Include JavaScript to handle winner selection
+        # Include JavaScript to handle winner selection and bid rejection
         output += '''
         <script>
         function selectWinner(winnerData) {
@@ -1749,44 +1845,171 @@ def EvaluateTender(request):
                 form.submit();
             }
         }
+        
+        function rejectBid(rejectData) {
+            if (confirm("Are you sure you want to reject this bid? This action cannot be undone.")) {
+                // Create a form to submit the reject data
+                var form = document.createElement("form");
+                form.setAttribute("method", "post");
+                form.setAttribute("action", "/evaluateReject");
+                
+                var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+                var csrfInput = document.createElement("input");
+                csrfInput.setAttribute("type", "hidden");
+                csrfInput.setAttribute("name", "csrfmiddlewaretoken");
+                csrfInput.setAttribute("value", csrfToken);
+                form.appendChild(csrfInput);
+                
+                var hiddenField = document.createElement("input");
+                hiddenField.setAttribute("type", "hidden");
+                hiddenField.setAttribute("name", "reject_data");
+                hiddenField.setAttribute("value", rejectData);
+                form.appendChild(hiddenField);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
         </script>
         '''
         
         # If no tenders found for evaluation, show empty state
         if not found_tenders:
-            output = ''
+            output = '<div class="alert alert-info">No pending tenders found for evaluation.</div>'
         
-        # Process automatic winner selection (legacy behavior)
-        # This selects winners automatically without user interaction
-        # We'll preserve this behavior to maintain compatibility
-        for title, data in tender_data.items():
-            # Skip tenders that already have winners
-            if title in winner_data:
-                continue
-                
+        context = {'data': output}
+        return render(request, 'EvaluateTender.html', context)
+        
+    # Handle POST for bid rejection - will be handled by evaluateReject view function
+    return redirect('EvaluateTender')
+
+# Handle bid rejection from the Evaluate Tender page
+def evaluateReject(request):
+    if request.method == 'POST':
+        # Get the reject data from the form
+        reject_data = request.POST.get('reject_data')
+        
+        # Parse reject data
+        arr = reject_data.split('#')
+        if len(arr) >= 4:
+            tender_title = arr[1]
+            bid_amount = arr[2]
+            username = arr[3]
+            
+            # Create a blockchain transaction to mark this bid as rejected
+            reject_transaction = f"reject#{tender_title}#{bid_amount}#{username}#{datetime.datetime.now()}"
+            enc = encrypt(str(reject_transaction))
+            blockchain.add_new_transaction(base64.b64encode(enc).decode('utf-8'))
+            blockchain.mine()
+            
+            # Update the blockchain file
+            with open('blockchain_contract.txt', 'wb') as fileoutput:
+                pickle.dump(blockchain, fileoutput)
+            fileoutput.close()
+            
+            # Clear cache to reflect new state immediately
+            global _blockchain_cache
+            _blockchain_cache['last_update'] = None
+            
+            # Create a notification for the bidder
+            notification_data = f"notification#{username}#Your bid for '{tender_title}' has been rejected.#Bid Rejected#danger"
+            enc = encrypt(str(notification_data))
+            blockchain.add_new_transaction(base64.b64encode(enc).decode('utf-8'))
+            blockchain.mine()
+            
+            # Update the blockchain file again
+            with open('blockchain_contract.txt', 'wb') as fileoutput:
+                pickle.dump(blockchain, fileoutput)
+            fileoutput.close()
+            
+            # Create a message for the officer
+            messages.success(request, f"Bid from {username} for tender '{tender_title}' has been rejected successfully.")
+        
+    return redirect('EvaluateTender')
+
+# Handle winner selection
+def evaluateWinner(request):
+    if request.method == 'POST':
+        # Get the winner data from the form
+        winner_data = request.POST.get('winner_data')
+        
+        # Parse the winner data
+        arr = winner_data.split('#')
+        if len(arr) >= 5:
+            tender_title = arr[1]
+            bid_amount = arr[2]
+            username = arr[4]  # Winner username
+            
             # Create winner transaction
-            winner_data = "winner#" + title + "#" + str(data["highest_bid"]) + "#" + title + "#" + data["highest_bidder"]
             enc = encrypt(str(winner_data))
             enc = str(base64.b64encode(enc), 'utf-8')
             blockchain.add_new_transaction(enc)
-            hash = blockchain.mine()
-            blockchain.save_object(blockchain, 'blockchain_contract.txt')
-        
-        context= {'data': output}
-        return render(request, 'EvaluateTender.html', context)                                    
+            blockchain.mine()
+            
+            # Update blockchain file
+            with open('blockchain_contract.txt', 'wb') as fileoutput:
+                pickle.dump(blockchain, fileoutput)
+            fileoutput.close()
+            
+            # Clear cache to reflect new state immediately
+            global _blockchain_cache
+            _blockchain_cache['last_update'] = None
+            
+            # Create a notification for the winner
+            winner_notification = f"notification#{username}#Congratulations! Your bid for '{tender_title}' has been selected as the winning bid!#Bid Won#success"
+            enc = encrypt(str(winner_notification))
+            blockchain.add_new_transaction(base64.b64encode(enc).decode('utf-8'))
+            blockchain.mine()
+            
+            # Create notifications for all other bidders that submitted to this tender
+            # First identify all users who bid on this tender
+            bidders = []
+            for i in range(len(blockchain.chain)):
+                if i > 0:
+                    try:
+                        b = blockchain.chain[i]
+                        data = b.transactions[0]
+                        data = base64.b64decode(data)
+                        data = str(decrypt(data))
+                        data = data[2:len(data)-1]
+                        arr = data.split("#")
+                        
+                        # Only look at bidding records
+                        if arr[0] == "bidding" and arr[1] == tender_title:
+                            bidder = arr[3]
+                            if bidder != username and bidder not in bidders:
+                                bidders.append(bidder)
+                    except Exception as e:
+                        continue
+            
+            # Notify all other bidders that they did not win
+            for bidder in bidders:
+                loser_notification = f"notification#{bidder}#The tender '{tender_title}' has been awarded to another bidder.#Bid Result#warning"
+                enc = encrypt(str(loser_notification))
+                blockchain.add_new_transaction(base64.b64encode(enc).decode('utf-8'))
+                blockchain.mine()
+            
+            # Update blockchain file again
+            with open('blockchain_contract.txt', 'wb') as fileoutput:
+                pickle.dump(blockchain, fileoutput)
+            fileoutput.close()
+            
+            # Create a message for the officer
+            messages.success(request, f"Winner selected successfully for tender '{tender_title}'!")
+    
+    # Redirect to winner selection page
+    return redirect('WinnerSelection')                                    
                     
        
 
 def WinnerSelection(request):
     if request.method == 'GET':
-        # Use modern table styling that works with our CSS
-        output = '<table class="table table-striped">'
-        output += '<thead><tr><th>Tender Title</th><th>Amount</th><th>Winner</th><th>Status</th></tr></thead><tbody>'
-        
-        # Dictionary to store winning bids
+        # Dictionary to store all tenders with winners and their details
         winners = {}
+        all_bids = {}
+        tender_details = {}
         
-        # First pass: collect all winner information 
+        # First pass: collect all tender information, winners and bids
         for i in range(len(blockchain.chain)):
             if i > 0:
                 try:
@@ -1797,36 +2020,163 @@ def WinnerSelection(request):
                     data = data[2:len(data)-1]
                     arr = data.split("#")
                     
+                    # Record tender information
+                    if arr[0] == "tender":
+                        tender_title = arr[1]
+                        tender_details[tender_title] = {
+                            'description': arr[2],
+                            'amount': arr[3],
+                            'close_date': arr[4],
+                            'category': arr[5] if len(arr) > 5 else 'Not specified'
+                        }
+                    
                     # Record winner information
-                    if arr[0] == "winner":
+                    elif arr[0] == "winner":
                         tender_title = arr[1]
                         bid_amount = arr[2]
                         username = arr[4]
                         
                         winners[tender_title] = {
                             'amount': bid_amount,
-                            'username': username
+                            'username': username,
+                            'timestamp': b.timestamp
                         }
+                    
+                    # Record all bid information for each tender
+                    elif arr[0] == "bidding":
+                        tender_title = arr[1]
+                        bid_amount = float(arr[2])
+                        username = arr[3]
+                        status = arr[4]
+                        
+                        # Additional bid details
+                        company_name = arr[5] if len(arr) > 5 else "Not specified"
+                        contact_person = arr[6] if len(arr) > 6 else "Not specified"
+                        email = arr[7] if len(arr) > 7 else "Not specified"
+                        phone = arr[8] if len(arr) > 8 else "Not specified"
+                        completion_days = arr[9] if len(arr) > 9 else "Not specified"
+                        proposal_summary = arr[10] if len(arr) > 10 else "Not specified"
+                        experience = arr[11] if len(arr) > 11 else "Not specified"
+                        
+                        if tender_title not in all_bids:
+                            all_bids[tender_title] = []
+                            
+                        all_bids[tender_title].append({
+                            'bid_amount': bid_amount,
+                            'username': username,
+                            'company_name': company_name,
+                            'contact_person': contact_person,
+                            'email': email,
+                            'phone': phone,
+                            'completion_days': completion_days,
+                            'proposal_summary': proposal_summary,
+                            'experience': experience,
+                            'status': status,
+                            'timestamp': b.timestamp
+                        })
                 except Exception as e:
                     # Skip any entries with parsing issues
-                    pass
+                    continue
         
-        # Generate table with winners
+        # Build HTML with cards for each tender with a winner
+        output = ''
         found_winners = False
-        for title, data in winners.items():
+        
+        for title, winner_data in winners.items():
             found_winners = True
-            output += f'<tr>'
-            output += f'<td>{title}</td>'
-            output += f'<td>{data["amount"]}</td>'
-            output += f'<td>{data["username"]}</td>'
-            output += f'<td><span class="badge badge-success"><i class="fas fa-trophy"></i> Winner Selected</span></td>'
-            output += f'</tr>'
+            
+            # Get tender details if available
+            tender_info = tender_details.get(title, {})
+            tender_description = tender_info.get('description', 'No description available')
+            tender_category = tender_info.get('category', 'Not specified')
+            
+            # Create a card for each tender with winner
+            output += f'''
+            <div class="card mb-4">
+                <div class="card-header bg-success text-white">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">{title}</h5>
+                        <span class="badge badge-light"><i class="fas fa-tag"></i> {tender_category}</span>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col">
+                            <h6>Description:</h6>
+                            <p>{tender_description}</p>
+                        </div>
+                    </div>
+                    <div class="winner-info alert alert-success">
+                        <h6><i class="fas fa-trophy"></i> Winner</h6>
+                        <div class="row">
+                            <div class="col-md-4">
+                                <strong>Bidder:</strong> {winner_data['username']}
+                            </div>
+                            <div class="col-md-4">
+                                <strong>Winning Amount:</strong> {winner_data['amount']}
+                            </div>
+                        </div>
+                    </div>
+            '''
+            
+            # If we have bids data for this tender, show all bids in a table
+            if title in all_bids and all_bids[title]:
+                # Sort bids by amount (lowest first since it's usually better in tenders)
+                bids = sorted(all_bids[title], key=lambda x: float(x['bid_amount']))
+                
+                output += f'''
+                    <h6 class="mt-4">All Submitted Bids:</h6>
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Bid Amount</th>
+                                <th>Company</th>
+                                <th>Contact Person</th>
+                                <th>Days to Complete</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                '''
+                
+                for bid in bids:
+                    # Determine status badge
+                    status_class = 'secondary'
+                    status_icon = 'clock'
+                    status_text = bid['status']
+                    
+                    if bid['username'] == winner_data['username']:
+                        status_class = 'success'
+                        status_icon = 'trophy'
+                        status_text = 'Winner'
+                    elif bid['status'] == 'Rejected' or (title in winners and bid['username'] != winner_data['username']):
+                        status_class = 'danger'
+                        status_icon = 'times'
+                        status_text = 'Lost'
+                    
+                    output += f'''
+                    <tr>
+                        <td>{bid['bid_amount']}</td>
+                        <td>{bid['company_name']}</td>
+                        <td>{bid['contact_person']}</td>
+                        <td>{bid['completion_days']}</td>
+                        <td><span class="badge badge-{status_class}"><i class="fas fa-{status_icon}"></i> {status_text}</span></td>
+                    </tr>
+                    '''
+                
+                output += '''
+                        </tbody>
+                    </table>
+                '''
+            
+            output += '''
+                </div>
+            </div>
+            '''
         
-        output += '</tbody></table>'
-        
-        # If no winners found, return empty string to trigger the empty state in template
+        # If no winners found, show empty state message
         if not found_winners:
-            output = ''
+            output = '<div class="alert alert-info">No tenders with selected winners found.</div>'
             
         context = {'data': output}
         return render(request, 'WinnerSelection.html', context)                    
@@ -1903,6 +2253,24 @@ def BidTenderActionPage(request):
                 # Then mine and save
                 hash = blockchain.mine()
                 blockchain.save_object(blockchain,'blockchain_contract.txt')
+                
+                # Create notification for tender officers
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                notification_data = f"notification#new_bid#{title}#{timestamp}#officer#unread"
+                
+                try:
+                    # Encrypt and add notification to blockchain
+                    enc_notification = encrypt(str(notification_data))
+                    enc_notification = str(base64.b64encode(enc_notification),'utf-8')
+                    blockchain.add_new_transaction(enc_notification)
+                    hash = blockchain.mine()
+                    blockchain.save_object(blockchain,'blockchain_contract.txt')
+                    print(f"Notification created for tender officers: New bid on {title} by {user}")
+                    
+                    # Reset notification cache so counts update immediately
+                    update_notification_cache()
+                except Exception as e:
+                    print(f"Error creating notification: {str(e)}")
                 
                 context = {
                     'data': f'Your bid for <strong>{title}</strong> has been successfully submitted.',
