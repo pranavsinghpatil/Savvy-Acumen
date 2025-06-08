@@ -10,34 +10,6 @@ import os
 from Blockchain import *
 import datetime
 
-# Initialize blockchain cache properly
-if '_blockchain_cache' not in globals() or not isinstance(_blockchain_cache, dict):
-    _blockchain_cache = {
-        'user_notifications': {},  # Cache notification counts by user
-        'tender_data': {},        # Cache tender data
-        'bid_data': {},           # Cache bid data 
-        'last_chain_length': 0,   # Track chain length to detect changes
-        'last_update': None,      # Timestamp of last update
-        'cache_hits': 0,          # Performance metrics
-        'cache_misses': 0
-    }
-else:
-    # Ensure all required keys exist to prevent KeyError
-    if 'user_notifications' not in _blockchain_cache:
-        _blockchain_cache['user_notifications'] = {}
-    if 'tender_data' not in _blockchain_cache:
-        _blockchain_cache['tender_data'] = {}
-    if 'bid_data' not in _blockchain_cache:
-        _blockchain_cache['bid_data'] = {}
-    if 'last_chain_length' not in _blockchain_cache:
-        _blockchain_cache['last_chain_length'] = 0
-    if 'last_update' not in _blockchain_cache:
-        _blockchain_cache['last_update'] = None
-    if 'cache_hits' not in _blockchain_cache:
-        _blockchain_cache['cache_hits'] = 0
-    if 'cache_misses' not in _blockchain_cache:
-        _blockchain_cache['cache_misses'] = 0
-
 # Initialize blockchain
 blockchain = Blockchain()
 if os.path.exists('blockchain_contract.txt'):
@@ -1038,14 +1010,6 @@ def is_tender_closed_early(tender_title):
 def get_cached_tenders(current_user):
     """Get active tenders with user bid status, using cache when possible"""
     global _blockchain_cache
-
-    # Ensure required cache keys exist
-    if 'cache_misses' not in _blockchain_cache:
-        _blockchain_cache['cache_misses'] = 0
-    if 'cache_hits' not in _blockchain_cache:
-        _blockchain_cache['cache_hits'] = 0
-    if 'tender_data' not in _blockchain_cache:
-        _blockchain_cache['tender_data'] = {}
     
     # Make sure _blockchain_cache is properly initialized
     ensure_blockchain_cache_initialized()
