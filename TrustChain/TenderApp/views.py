@@ -102,6 +102,27 @@ def OfficerOngoingTenders(request):
             arr = data.split("#")
             if arr[0] == "tender":
                 title = arr[1]
+                
+                # Check if it's a deleted tender
+                if is_tender_deleted(title):
+                    debug_log.append(f"Skipping deleted tender: {title}")
+                    continue
+                    
+                # Check if the tender was manually closed early
+                closed_early, close_early_date = is_tender_closed_early(title)
+                if closed_early:
+                    debug_log.append(f"Tender {title} was manually closed on {close_early_date}")
+                    tender_data = {
+                        'title': title,
+                        'description': description,
+                        'open_date': open_date,
+                        'close_date': close_early_date,  # Use the manual close date
+                        'amount': amount,
+                        'status': 'Closed Early'
+                    }
+                    closed_tenders.append(tender_data)
+                    continue
+                    
                 description = arr[2]
                 open_date = arr[3]
                 close_date = arr[4]
@@ -242,6 +263,36 @@ def DeleteTender(request):
         data_encoded = str(base64.b64encode(encrypt(str(data))),'utf-8')
         blockchain.add_new_transaction(data_encoded)
         hash = blockchain.mine()
+        
+        # Save changes to blockchain file
+        blockchain.save_object(blockchain, 'blockchain_contract.txt')
+        
+        # For debugging - print delete success message
+        print(f"Successfully deleted tender: {tender_title}")
+    
+    # Redirect back to ongoing tenders page
+    return redirect('OfficerOngoingTenders')
+
+
+def CloseTender(request):
+    # Get the title from the query parameters
+    tender_title = request.GET.get('title', '')
+    
+    if tender_title:
+        # Get current date as close date
+        current_date = datetime.now().strftime('%d-%m-%Y')
+        
+        # Add a transaction marking the tender as closed early
+        data = f"close_tender#{tender_title}#{current_date}"
+        data_encoded = str(base64.b64encode(encrypt(str(data))),'utf-8')
+        blockchain.add_new_transaction(data_encoded)
+        hash = blockchain.mine()
+        
+        # Save changes to blockchain file
+        blockchain.save_object(blockchain, 'blockchain_contract.txt')
+        
+        # For debugging - print close success message
+        print(f"Successfully closed tender: {tender_title} on {current_date}")
     
     # Redirect back to ongoing tenders page
     return redirect('OfficerOngoingTenders')
@@ -285,19 +336,74 @@ def BidTenderAction(request):
         return render(request, 'BidTenderAction.html', context)
         
         
+def is_tender_deleted(tender_title):
+    """Check if a tender has been marked as deleted"""
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                
+                arr = data.split("#")
+                if arr[0] == "delete_tender" and arr[1] == tender_title:
+                    return True
+            except Exception:
+                pass
+    return False
+
+def is_tender_closed_early(tender_title):
+    """Check if a tender has been manually closed early"""
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                
+                arr = data.split("#")
+                if arr[0] == "close_tender" and arr[1] == tender_title:
+                    return True, arr[2] if len(arr) > 2 else datetime.now().strftime('%d-%m-%Y')
+            except Exception:
+                pass
+    return False, None
+
 def BidTender(request):
     if request.method == 'GET':
-        # Use modern table styling that works with our CSS
-        output = '<table class="table table-striped">'
-        output += '<thead><tr><th>Tender Title</th><th>Tender Description</th><th>Open Date</th><th>Close Date</th><th>Amount</th><th>Action</th></tr></thead><tbody>'
+        # Create modern card-based layout instead of table
+        output = '<div class="tender-grid">'
         
         current_date = datetime.now()
         current = int(round(current_date.timestamp()))
+        now = datetime.now()
         found_tenders = False
         
         # For debugging - keep track of tenders and why they're filtered out
         all_tenders = 0
         filtered_tenders = 0
+        debug_log = []
+        
+        # First, find all tenders with winners
+        winner_titles = set()
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    
+                    arr = data.split("#")
+                    if arr[0] == "winner":
+                        tender_title = arr[1]
+                        winner_titles.add(tender_title)
+                except Exception:
+                    pass
         
         for i in range(len(blockchain.chain)):
             if i > 0:
@@ -311,49 +417,155 @@ def BidTender(request):
                     arr = data.split("#")
                     if arr[0] == "tender":
                         all_tenders += 1
-                        # Important: Check if this tender already has a winner
-                        winner_status = getWinner(arr[1])
+                        title = arr[1]
                         
-                        if winner_status == "none":
-                            # Try different date formats since the form might submit in various formats
-                            date_formats = ["%d-%m-%Y", "%d/%m/%Y"]
-                            open_date_parsed = None
-                            close_date_parsed = None
+                        # Skip tenders that have been deleted
+                        if is_tender_deleted(title):
+                            filtered_tenders += 1
+                            debug_log.append(f"Skipping deleted tender: {title}")
+                            continue
+                        
+                        # Skip tenders that have winners
+                        if title in winner_titles:
+                            filtered_tenders += 1
+                            debug_log.append(f"Skipping awarded tender: {title}")
+                            continue
                             
-                            for fmt in date_formats:
-                                try:
-                                    open_date_parsed = datetime.strptime(arr[3], fmt)
-                                    close_date_parsed = datetime.strptime(arr[4], fmt)
-                                    break
-                                except ValueError:
-                                    continue
-                            
-                            # If we couldn't parse the dates with any format, skip this tender
-                            if not open_date_parsed or not close_date_parsed:
+                        # Skip tenders that have been manually closed early
+                        closed_early, _ = is_tender_closed_early(title)
+                        if closed_early:
+                            filtered_tenders += 1
+                            debug_log.append(f"Skipping closed tender: {title}")
+                            continue
+                        
+                        description = arr[2]
+                        open_date = arr[3]
+                        close_date = arr[4]
+                        amount = arr[5]
+                        industry = arr[6] if len(arr) > 6 else 'General'
+                        
+                        # Parse dates using multiple formats (same as officer view)
+                        open_dt = None
+                        close_dt = None
+                        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                            try:
+                                open_dt = datetime.strptime(open_date, fmt)
+                                break
+                            except Exception:
                                 continue
+                                
+                        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                            try:
+                                close_dt = datetime.strptime(close_date, fmt)
+                                break
+                            except Exception:
+                                continue
+                        
+                        # Skip if dates couldn't be parsed
+                        if open_dt is None or close_dt is None:
+                            debug_log.append(f"Skipping tender with invalid dates: {title}")
+                            continue
                             
-                            # REMOVED the timestamp comparison to show all available tenders
-                            # We'll display all tenders that don't have a winner yet
-                            found_tenders = True
-                            output += f'<tr><td>{arr[1]}</td><td>{arr[2]}</td><td>{arr[3]}</td><td>{arr[4]}</td><td>{arr[5]}</td>'
-                            # Improved button styling for better visibility
-                            output += f'<td><a href="BidTenderAction?title={arr[1]}" class="btn btn-sm action-btn"><i class="fas fa-gavel"></i> Bid Now</a></td></tr>'
+                        # Skip closed tenders
+                        if close_dt < now:
+                            debug_log.append(f"Skipping tender that's already closed: {title}")
+                            continue
+                        
+                        # Add a flag for future tenders (not open yet but viewable)
+                        is_future = open_dt > now
+                        
+                        # Mark that we found at least one tender
+                        found_tenders = True
+                        
+                        # Create a modern card for each tender with consistent height
+                        output += f'''
+                        <div class="tender-card">
+                            <div class="tender-card-header">
+                                <h4>{title}</h4>
+                                <span class="badge badge-success"><i class="fas fa-clock"></i> Open To Bid</span>
+                            </div>
+                            <div class="tender-card-body">
+                                <p class="description"><i class="fas fa-info-circle"></i> {description[:100]}{'...' if len(description) > 100 else ''}</p>
+                                <div class="details-row">
+                                    <div class="detail-item"><i class="fas fa-calendar-plus"></i> Open: {open_date}</div>
+                                    <div class="detail-item"><i class="fas fa-calendar-times"></i> Close: {close_date}</div>
+                                    <div class="detail-item"><i class="fas fa-coins"></i> Amount: {amount}</div>
+                                </div>
+                                <div class="category-info">
+                                    <div class="detail-item"><i class="fas fa-industry"></i> Industry: {industry}</div>
+                                </div>
+                            </div>
+                            <div class="tender-card-actions">
+                                <a href="TenderDetail?title={title}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> View Details</a>
+                                <a href="BidTenderAction?title={title}" class="btn btn-sm action-btn"><i class="fas fa-gavel"></i> Bid Now</a>
+                            </div>
+                        </div>'''
                 except Exception as e:
                     # Log exception but continue processing other blocks
                     print(f"Error processing block {i}: {str(e)}")
                     pass
         
-        output += '</tbody></table>'
+        output += '</div>'
         
         # Only set the output if tenders were found
         if not found_tenders:
             output = ''
             
-        context = {
-            'data': output,
-            'debug_info': f"Total tenders found: {all_tenders}, Filtered: {filtered_tenders}"
-        }
+        context = {'data': output}
         return render(request, 'BidTender.html', context)
+
+
+def TenderDetail(request):
+    if request.method == 'GET':
+        # Get the tender title from the query parameters
+        title = request.GET.get('title', '')
+        title = title.replace('"', '')
+        
+        tender_data = None
+        
+        # Check if the tender has been deleted
+        if is_tender_deleted(title):
+            # Return with no tender data to show the 'Tender Not Found' message
+            context = {'tender': None}
+            return render(request, 'TenderDetail.html', context)
+        
+        # Search for the tender in the blockchain
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    
+                    arr = data.split("#")
+                    if arr[0] == "tender" and arr[1] == title:
+                        # Check if this tender is available (no winner)
+                        winner_status = getWinner(arr[1])
+                        
+                        if winner_status == "none":
+                            # Format: tender#title#description#open_date#close_date#amt#industry#category#location#eligibility#specifications
+                            tender_data = {
+                                'title': arr[1],
+                                'description': arr[2],
+                                'open_date': arr[3],
+                                'close_date': arr[4],
+                                'amount': arr[5],
+                                'industry': arr[6],
+                                'category': arr[7],
+                                'location': arr[8],
+                                'eligibility': arr[9],
+                                'specifications': arr[10]
+                            }
+                            break
+                except Exception as e:
+                    # Log exception but continue processing other blocks
+                    print(f"Error processing tender details for {title}: {str(e)}")
+                    pass
+        
+        context = {'tender': tender_data}
+        return render(request, 'TenderDetail.html', context)
 
 
 def ViewTender(request):
@@ -630,9 +842,18 @@ def WinnerSelection(request):
 def BidTenderActionPage(request):
     if request.method == 'POST':
         try:
-            # Get form data
+            # Get basic form data
             title = request.POST.get('t1', '')
             amount = request.POST.get('t2', '')
+            
+            # Get additional form fields
+            company_name = request.POST.get('companyName', '')
+            contact_person = request.POST.get('contactPerson', '')
+            contact_email = request.POST.get('contactEmail', '')
+            contact_phone = request.POST.get('contactPhone', '')
+            completion_time = request.POST.get('completionTime', '')
+            proposal_details = request.POST.get('proposalDetails', '')
+            experience = request.POST.get('experience', '')
             
             # Strip any unnecessary quotes or spaces
             title = title.strip().replace('"', '')
@@ -646,6 +867,16 @@ def BidTenderActionPage(request):
                     return render(request, 'BidTenderAction.html', context)
             except ValueError:
                 context = {'data': 'Invalid bid amount. Please enter a valid number.'}
+                return render(request, 'BidTenderAction.html', context)
+            
+            # Validate completion time is a valid number
+            try:
+                completion_days = int(completion_time)
+                if completion_days <= 0:
+                    context = {'data': 'Invalid completion time. Please enter a positive number of days.'}
+                    return render(request, 'BidTenderAction.html', context)
+            except ValueError:
+                context = {'data': 'Invalid completion time. Please enter a valid number of days.'}
                 return render(request, 'BidTenderAction.html', context)
             
             # Get current user from session
@@ -664,8 +895,9 @@ def BidTenderActionPage(request):
                 context = {'data': 'User session expired. Please log in again.'}
                 return render(request, 'BidTenderAction.html', context)
                 
-            # Create the bid data and encrypt it
-            data = f"bidding#{title}#{amount}#{user}#Pending"
+            # Create the bid data with all fields and encrypt it
+            # Format: bidding#title#amount#user#status#company#contact_person#email#phone#completion_days#proposal_summary#experience
+            data = f"bidding#{title}#{amount}#{user}#Pending#{company_name}#{contact_person}#{contact_email}#{contact_phone}#{completion_time}#{proposal_details[:200]}#{experience[:200]}"
             
             # Add to blockchain
             try:
@@ -707,12 +939,27 @@ def checkUser(username):
 
 def CreateTenderAction(request):
     if request.method == 'POST':
-        title = request.POST.get('t1', False)
-        description = request.POST.get('t2', False)
-        open_date = request.POST.get('t3', False)
-        close_date = request.POST.get('t4', False)
-        amt = request.POST.get('t5', False)
-        data = "tender#"+title+"#"+description+"#"+open_date+"#"+close_date+"#"+amt
+        # Get basic tender data
+        title = request.POST.get('t1', '')
+        description = request.POST.get('t2', '')
+        open_date = request.POST.get('t3', '')
+        close_date = request.POST.get('t4', '')
+        amt = request.POST.get('t5', '')
+        
+        # Get additional tender context fields
+        industry = request.POST.get('industry', 'Not Specified')
+        category = request.POST.get('category', 'Not Specified')
+        location = request.POST.get('location', 'Not Specified')
+        
+        # Get the eligibility and specifications fields
+        eligibility = request.POST.get('eligibility', 'Not Specified')
+        specifications = request.POST.get('specifications', 'Not Specified')
+        
+        # Create data string format for blockchain
+        # Format: tender#title#description#open_date#close_date#amt#industry#category#location#eligibility#specifications
+        data = f"tender#{title}#{description}#{open_date}#{close_date}#{amt}#{industry}#{category}#{location}#{eligibility}#{specifications}"
+        
+        # Encrypt and store in blockchain
         enc = encrypt(str(data))
         enc = str(base64.b64encode(enc),'utf-8')
         blockchain.add_new_transaction(enc)

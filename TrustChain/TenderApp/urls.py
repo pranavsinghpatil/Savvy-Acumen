@@ -11,6 +11,7 @@ urlpatterns = [
     path('officer/ongoing-tenders/', OfficerOngoingTenders, name='OfficerOngoingTenders'),
     path('EditTender/<str:tender_title>', views.EditTender, name='EditTender'),
     path('DeleteTender', views.DeleteTender, name='DeleteTender'),
+    path('CloseTender', views.CloseTender, name='CloseTender'),
     path("index.html", views.index, name="index"),
     path("TenderLogin.html", views.TenderLogin, name="TenderLogin"),
     path("TenderLoginAction", views.TenderLoginAction, name="TenderLoginAction"),
@@ -27,6 +28,7 @@ urlpatterns = [
     path("Signup", views.Signup, name="Signup"),
     path("BidTenderActionPage", views.BidTenderActionPage, name="BidTenderActionPage"),
     path("BidTenderAction", views.BidTenderAction, name="BidTenderAction"),
+    path("TenderDetail", views.TenderDetail, name="TenderDetail"),
     # Other paths continue below but are already defined above
     # path("ViewTender", views.ViewTender, name="ViewTender"),
     # path("EvaluateTender", views.EvaluateTender, name="EvaluateTender"),
