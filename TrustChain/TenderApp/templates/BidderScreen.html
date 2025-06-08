@@ -6,7 +6,25 @@
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<style>/* This comment is now inside the style tag */
+[style*="background-color: white"],
+[style*="background-color:#ffffff"],
+[style*="background-color: #fff"],
+[style*="background:#ffffff"],
+[style*="background: white"],
+[style*="background: #fff"],
+.card,
+.panel,
+.container-card,
+.white-bg {
+  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%) !important;
+  border-color: #b2ebf2 !important;
+}
+</style>
+
 </head>
 <body>
 <div id="wrapper">
@@ -23,8 +41,10 @@
   <div id="menu">
     <div class="container">
       <ul>
+        <li class="current_page_item"><a href="{% url 'BidderScreen' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
         <li><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
         <li><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'BidderNotifications' %}"><i class="fas fa-bell"></i> Notifications {% if unread_notification_count > 0 %}<span class="badge badge-danger" style="font-size: 0.7rem; position: relative; top: -1px; margin-left: 3px;">{{ unread_notification_count }}</span>{% endif %}</a></li>
         <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
       </ul>
     </div>
@@ -36,6 +56,7 @@
           <div class="title">
             <h2 style="color:#18c964;"><i class="fas fa-user"></i> Bidder Dashboard</h2>
           </div>
+
           <div class="entry">
             {% if data %}
             <div class="card">
@@ -70,12 +91,8 @@
     </div>
   </div>
 
-  <div id="footer">
-    <div class="container">
-      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
-      <p>Secure • Transparent • Efficient</p>
-    </div>
-  </div>
+  <!-- Include modern footer component -->
+  {% include 'components/footer.html' %}
 
 </body>
 </html>

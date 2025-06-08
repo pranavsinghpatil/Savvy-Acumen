@@ -5,6 +5,10 @@ def TenderScreen(request):
     if request.method == 'GET':
         return render(request, 'TenderScreen.html', {})
 
+def BidderScreen(request):
+    if request.method == 'GET':
+        return render(request, 'BidderScreen.html', {})
+
 from django.contrib import messages
 from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
@@ -478,8 +482,7 @@ def BidTender(request):
                         found_tenders = True
                         
                         # Create a modern card for each tender with consistent height
-                        output += f'''
-                        <div class="tender-card">
+                        output += f'''<div class="tender-card">
                             <div class="tender-card-header">
                                 <h4>{title}</h4>
                                 <span class="badge badge-success"><i class="fas fa-clock"></i> Open To Bid</span>
@@ -614,8 +617,20 @@ def ViewTender(request):
         # Generate table rows from the collected data
         for title, bid_info in user_bids.items():
             status = bid_info['status']
-            status_class = 'success' if status == 'Winner' else 'warning'
-            status_icon = 'trophy' if status == 'Winner' else 'hourglass'
+            
+            # Set appropriate style based on status
+            if status == 'Winner':
+                status_class = 'success'
+                status_icon = 'trophy'
+            elif status == 'Lost':
+                status_class = 'warning'
+                status_icon = 'times-circle'
+            elif status == 'Closed':
+                status_class = 'secondary'
+                status_icon = 'lock'
+            else:  # Pending
+                status_class = 'info'
+                status_icon = 'hourglass'
             
             output += f'<tr>'
             output += f'<td>{title}</td>'
@@ -650,18 +665,58 @@ def getWinner(title):
     return output
 
 def getWinners(title, bidder):
-    output = 'Lost'
+    # Default status is Pending
+    output = 'Pending'
+    winner_exists = False
+    winner_is_current_bidder = False
+    is_closed = False
+    
+    # First check if tender is closed
     for i in range(len(blockchain.chain)):
         if i > 0:
-            b = blockchain.chain[i]
-            data = b.transactions[0]
-            data = base64.b64decode(data)
-            data = str(decrypt(data))
-            data = data[2:len(data)-1]
-            arr = data.split("#")
-            if arr[0] == "winner" and arr[1] == title and arr[4] == bidder:
-                output = "Winner"
-                break
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                # Check if this is the tender we're looking for
+                if arr[0] == "tender" and arr[1] == title:
+                    # Format: tender#title#description#open_date#close_date#amt#industry#category#location#eligibility#specifications
+                    close_date = arr[4]
+                    
+                    # Parse close date
+                    close_dt = None
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            close_dt = datetime.strptime(close_date, fmt)
+                            break
+                        except:
+                            continue
+                    
+                    # Check if tender is closed
+                    if close_dt and close_dt < datetime.now():
+                        is_closed = True
+                        
+                # Check if there's a winner for this tender
+                if arr[0] == "winner" and arr[1] == title:
+                    winner_exists = True
+                    if arr[4] == bidder:
+                        winner_is_current_bidder = True
+            except:
+                pass
+
+    # Determine final status
+    if is_closed and not winner_exists:
+        output = "Closed"
+    elif winner_exists:
+        if winner_is_current_bidder:
+            output = "Winner"
+        else:
+            output = "Lost"
+            
     return output
 
 def EvaluateTender(request):
@@ -863,61 +918,72 @@ def BidTenderActionPage(request):
             try:
                 float_amount = float(amount)
                 if float_amount <= 0:
-                    context = {'data': 'Invalid bid amount. Please enter a positive number.'}
+                    context = {'data': 'Invalid bid amount. Please enter a positive number.', 'error': True}
                     return render(request, 'BidTenderAction.html', context)
             except ValueError:
-                context = {'data': 'Invalid bid amount. Please enter a valid number.'}
+                context = {'data': 'Invalid bid amount. Please enter a valid number.', 'error': True}
                 return render(request, 'BidTenderAction.html', context)
             
             # Validate completion time is a valid number
             try:
                 completion_days = int(completion_time)
                 if completion_days <= 0:
-                    context = {'data': 'Invalid completion time. Please enter a positive number of days.'}
+                    context = {'data': 'Invalid completion time. Please enter a positive number of days.', 'error': True}
                     return render(request, 'BidTenderAction.html', context)
             except ValueError:
-                context = {'data': 'Invalid completion time. Please enter a valid number of days.'}
+                context = {'data': 'Invalid completion time. Please enter a valid number of days.', 'error': True}
                 return render(request, 'BidTenderAction.html', context)
             
             # Get current user from session
-            user = ''
-            try:
-                with open("session.txt", "r") as file:
-                    for line in file:
-                        user = line.strip('\n')
-                        break  # Only read the first line
-                    file.close()
-            except Exception as e:
-                context = {'data': 'Error retrieving user session. Please log in again.'}
-                return render(request, 'BidTenderAction.html', context)
+            user = request.session.get('username')
+            if not user:
+                # Fallback to file-based session if not in Django session
+                try:
+                    with open("session.txt", "r") as file:
+                        for line in file:
+                            user = line.strip('\n')
+                            break  # Only read the first line
+                except Exception:
+                    pass
             
             if not user:
-                context = {'data': 'User session expired. Please log in again.'}
+                context = {'data': 'User session expired. Please log in again.', 'error': True}
                 return render(request, 'BidTenderAction.html', context)
                 
             # Create the bid data with all fields and encrypt it
             # Format: bidding#title#amount#user#status#company#contact_person#email#phone#completion_days#proposal_summary#experience
             data = f"bidding#{title}#{amount}#{user}#Pending#{company_name}#{contact_person}#{contact_email}#{contact_phone}#{completion_time}#{proposal_details[:200]}#{experience[:200]}"
             
-            # Add to blockchain
+            # Add to blockchain with optimized processing
             try:
+                # Pre-compute encryption to improve performance
                 enc = encrypt(str(data))
                 enc = str(base64.b64encode(enc),'utf-8')
+                
+                # Add transaction first
                 blockchain.add_new_transaction(enc)
+                
+                # Then mine and save
                 hash = blockchain.mine()
                 blockchain.save_object(blockchain,'blockchain_contract.txt')
                 
                 context = {
                     'data': f'Your bid for <strong>{title}</strong> has been successfully submitted.',
-                    'success': True
+                    'success': True,
+                    'title': title
                 }
+                
+                # Set a session flag indicating a recent successful bid
+                request.session['recent_bid'] = True
+                request.session['recent_bid_title'] = title
+                
             except Exception as e:
-                context = {'data': f'Error submitting bid: {str(e)}'}
+                context = {'data': f'Error submitting bid: {str(e)}', 'error': True}
                 
             return render(request, 'BidTenderAction.html', context)
             
         except Exception as e:
-            context = {'data': f'An unexpected error occurred: {str(e)}'}
+            context = {'data': f'An unexpected error occurred: {str(e)}', 'error': True}
             return render(request, 'BidTenderAction.html', context)
 
 def checkUser(username):
@@ -1040,5 +1106,144 @@ def BidderLoginAction(request):
         
         
 
-        
+def BidderScreen(request):
+    # Basic view to render the bidder dashboard
+    return render(request, 'BidderScreen.html')
+
+def BidderNotifications(request):
+    from django.utils import timezone
+    import json
+    current_user = ''
+    try:
+        current_user = request.session.get('username', '')
+        if not current_user:
+            with open("session.txt", "r") as file:
+                for line in file:
+                    current_user = line.strip('\n')
+                    break
+    except:
+        pass
+
+    # Mark all as read if requested
+    if request.method == 'POST' and request.GET.get('mark_read') == '1':
+        request.session['notifications_read'] = timezone.now().timestamp()
+        request.session.modified = True
+        return render(request, 'BidderNotifications.html', {'notifications': '', 'unread_count': 0})
+
+    output = ''
+    notifications_found = False
+    user_bids = {}
+    winner_notifications = {}
+    tender_closures = {}
+    notifications = []
+    latest_time = 0
+
+    # Scan blockchain for status changes related to the user's bids
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                # Store user bids
+                if arr[0] == "bidding" and arr[3] == current_user:
+                    tender_title = arr[1]
+                    bid_amount = arr[2]
+                    timestamp = b.timestamp
+                    if tender_title not in user_bids or timestamp > user_bids[tender_title]['timestamp']:
+                        user_bids[tender_title] = {
+                            'amount': bid_amount,
+                            'timestamp': timestamp
+                        }
+                # Store winner notifications
+                elif arr[0] == "winner":
+                    tender_title = arr[1]
+                    winner = arr[4]
+                    timestamp = b.timestamp
+                    if tender_title in user_bids or winner == current_user:
+                        winner_notifications[tender_title] = {
+                            'winner': winner,
+                            'timestamp': timestamp,
+                            'amount': arr[2]
+                        }
+                # Store tender information for closure detection
+                elif arr[0] == "tender":
+                    tender_title = arr[1]
+                    close_date = arr[4]
+                    close_dt = None
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            close_dt = datetime.strptime(close_date, fmt)
+                            break
+                        except:
+                            continue
+                    if close_dt and close_dt < datetime.now():
+                        tender_closures[tender_title] = {
+                            'close_date': close_date,
+                            'close_dt': close_dt
+                        }
+            except Exception as e:
+                pass
+
+    # Winner notifications
+    for title, data in winner_notifications.items():
+        is_winner = data['winner'] == current_user
+        notifications.append({
+            'title': "Congratulations! You won the tender!" if is_winner else "Tender result announced",
+            'message': f"Your bid for '{title}' has been selected as the winning bid!" if is_winner else f"The tender '{title}' has been awarded to {data['winner']}",
+            'timestamp': data['timestamp'],
+            'type': 'success' if is_winner else 'info',
+            'icon': 'trophy' if is_winner else 'award'
+        })
+        if data['timestamp'] > latest_time:
+            latest_time = data['timestamp']
+    # Tender closure notifications
+    for title, closure in tender_closures.items():
+        if title in user_bids and title not in winner_notifications:
+            notifications.append({
+                'title': "Tender closed",
+                'message': f"The tender '{title}' has closed without a winner selection.",
+                'timestamp': closure['close_dt'].timestamp(),
+                'type': 'warning',
+                'icon': 'lock'
+            })
+            if closure['close_dt'].timestamp() > latest_time:
+                latest_time = closure['close_dt'].timestamp()
+    notifications.sort(key=lambda x: x['timestamp'], reverse=True)
+
+    # Unread logic
+    notifications_read = request.session.get('notifications_read', 0)
+    unread_count = 0
+    output = ''
+    if notifications:
+        notifications_found = True
+        for notif in notifications:
+            is_unread = notif['timestamp'] > notifications_read
+            if is_unread:
+                unread_count += 1
+            try:
+                timestamp = datetime.fromtimestamp(notif['timestamp'])
+                formatted_time = timestamp.strftime("%d %b %Y, %H:%M")
+            except:
+                formatted_time = "Recently"
+            output += f'''
+            <li class="notification-item{' unread' if is_unread else ''}">
+                <div class="notification-icon {notif['type']}">
+                    <i class="fas fa-{notif['icon']}"></i>
+                </div>
+                <div class="notification-content">
+                    <div class="notification-title">{notif['title']}</div>
+                    <div class="notification-text">{notif['message']}</div>
+                    <div class="notification-time">{formatted_time}</div>
+                </div>
+            </li>'''
+    context = {
+        'notifications': output if notifications_found else '',
+        'unread_count': unread_count
+    }
+    return render(request, 'BidderNotifications.html', context)
+
             

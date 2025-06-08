@@ -6,10 +6,49 @@
 <meta http-equiv="content-type" content="text/html; charset=utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
 <link href="{% static 'custom.css' %}" rel="stylesheet" type="text/css" media="screen" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+  // Show loading overlay immediately when page starts loading
+  document.addEventListener('DOMContentLoaded', function() {
+    // Hide loading overlay when content is fully loaded
+    setTimeout(function() {
+      document.getElementById('loading-overlay').style.display = 'none';
+    }, 500); // Small delay to ensure smooth transition
+  });
+</script>
+
+<style>/* This comment is now inside the style tag */
+[style*="background-color: white"],
+[style*="background-color:#ffffff"],
+[style*="background-color: #fff"],
+[style*="background:#ffffff"],
+[style*="background: white"],
+[style*="background: #fff"],
+.card,
+.panel,
+.container-card,
+.white-bg {
+  background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%) !important;
+  border-color: #b2ebf2 !important;
+}
+</style>
+
 </head>
 <body>
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="loading-content">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">
+      <h3>Loading Tenders...</h3>
+      <p>Please wait while we securely retrieve tender information from the blockchain</p>
+    </div>
+  </div>
+</div>
+
 <div id="wrapper">
   <div id="header">
     <div class="container">
@@ -24,8 +63,10 @@
   <div id="menu">
     <div class="container">
       <ul>
+        <li><a href="{% url 'BidderScreen' %}"><i class="fas fa-tachometer-alt"></i> Dashboard</a></li>
         <li class="current_page_item"><a href="{% url 'BidTender' %}"><i class="fas fa-gavel"></i> Bid Tender</a></li>
         <li><a href="{% url 'ViewTender' %}"><i class="fas fa-clipboard-list"></i> View Tender Status</a></li>
+        <li><a href="{% url 'BidderNotifications' %}"><i class="fas fa-bell"></i> Notifications {% if unread_notification_count > 0 %}<span class="badge badge-danger" style="font-size: 0.7rem; position: relative; top: -1px; margin-left: 3px;">{{ unread_notification_count }}</span>{% endif %}</a></li>
         <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
       </ul>
     </div>
@@ -66,12 +107,8 @@
     </div>
   </div>
 
-  <div id="footer">
-    <div class="container">
-      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
-      <p>Secure • Transparent • Efficient</p>
-    </div>
-  </div>
+  <!-- Include modern footer component -->
+  {% include 'components/footer.html' %}
 
 </body>
 </html>

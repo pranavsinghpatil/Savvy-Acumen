@@ -8,6 +8,8 @@ from .views import OfficerOngoingTenders
 
 urlpatterns = [
     path('TenderScreen', views.TenderScreen, name='TenderScreen'),
+    path('BidderScreen', views.BidderScreen, name='BidderScreen'),
+    path('BidderNotifications', views.BidderNotifications, name='BidderNotifications'),
     path('officer/ongoing-tenders/', OfficerOngoingTenders, name='OfficerOngoingTenders'),
     path('EditTender/<str:tender_title>', views.EditTender, name='EditTender'),
     path('DeleteTender', views.DeleteTender, name='DeleteTender'),

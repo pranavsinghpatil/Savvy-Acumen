@@ -8,6 +8,7 @@
 <link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
 <link rel="icon" type="image/x-icon" href="{% static 'favicon.ico' %}" />
 <link href="{% static 'feature-img.css' %}" rel="stylesheet" type="text/css" media="screen" />
+<link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
@@ -104,12 +105,8 @@
     </div>
   </div>
 
-  <div id="footer">
-    <div class="container">
-      <p>&copy; {% now "Y" %} TrustChain - A Blockchain-based Tender Management System</p>
-      <p>Secure • Transparent • Efficient</p>
-    </div>
-  </div>
+  <!-- Include modern footer component -->
+  {% include 'components/footer.html' %}
 
 </body>
 </html>
