@@ -81,10 +81,16 @@
                     <td>{{ tender.amount }}</td>
                     <td>
                       {% if '/officer/ongoing-tenders/' in request.path %}
-                        <a href="{% url 'EditTender' tender_title=tender.title %}" class="btn btn-primary btn-sm"><i class="fas fa-edit"></i> Edit</a>
+                        <a href="{% url 'EditTender' tender_title=tender.title %}" class="btn btn-primary btn-sm tender-action-btn"><i class="fas fa-edit"></i> Edit</a>
+                        <form action="{% url 'CloseTender' %}" method="GET" style="display: inline;">
+                          <input type="hidden" name="title" value="{{ tender.title }}">
+                          <button type="submit" class="btn btn-warning btn-sm tender-action-btn" onclick="return confirm('Are you sure you want to close tender: {{ tender.title }}?\nThis will immediately terminate the tender and move it to closed tenders section.');"> 
+                            <i class="fas fa-lock"></i> Close
+                          </button>
+                        </form>
                         <form action="{% url 'DeleteTender' %}" method="GET" style="display: inline;">
                           <input type="hidden" name="title" value="{{ tender.title }}">
-                          <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Are you sure you want to delete tender: {{ tender.title }}?\nThis action cannot be undone.');">
+                          <button type="submit" class="btn btn-danger btn-sm tender-action-btn" onclick="return confirm('Are you sure you want to delete tender: {{ tender.title }}?\nThis action cannot be undone.');">
                             <i class="fas fa-trash-alt"></i> Delete
                           </button>
                         </form>
