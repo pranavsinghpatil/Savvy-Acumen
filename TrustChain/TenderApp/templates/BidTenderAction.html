@@ -10,6 +10,11 @@
 <script type="text/javascript">
 function validateBid() {
 	var bidAmount = document.forms["bidForm"]["t2"].value;
+	var companyName = document.forms["bidForm"]["companyName"].value;
+	var contactPerson = document.forms["bidForm"]["contactPerson"].value;
+	var contactEmail = document.forms["bidForm"]["contactEmail"].value;
+	var contactPhone = document.forms["bidForm"]["contactPhone"].value;
+	var completionTime = document.forms["bidForm"]["completionTime"].value;
 	
 	if(bidAmount === null || bidAmount.trim() === "") {
 		alert("Please enter a bid amount");
@@ -21,6 +26,35 @@ function validateBid() {
 	if(isNaN(bidAmount) || parseFloat(bidAmount) <= 0) {
 		alert("Please enter a valid positive number for the bid amount");
 		document.bidForm.t2.focus();
+		return false;
+	}
+	
+	// Validate company name
+	if(companyName === null || companyName.trim() === "") {
+		alert("Please enter your company name");
+		document.bidForm.companyName.focus();
+		return false;
+	}
+	
+	// Validate contact person
+	if(contactPerson === null || contactPerson.trim() === "") {
+		alert("Please enter the contact person's name");
+		document.bidForm.contactPerson.focus();
+		return false;
+	}
+	
+	// Validate email format
+	var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	if(!emailRegex.test(contactEmail)) {
+		alert("Please enter a valid email address");
+		document.bidForm.contactEmail.focus();
+		return false;
+	}
+	
+	// Validate completion time
+	if(completionTime === null || completionTime.trim() === "") {
+		alert("Please enter the estimated completion time");
+		document.bidForm.completionTime.focus();
 		return false;
 	}
 	
@@ -84,6 +118,42 @@ function validateBid() {
                   <label for="bidAmount"><i class="fas fa-coins"></i> Bid Amount</label>
                   <input type="text" name="t2" id="bidAmount" class="form-control" placeholder="Enter your bid amount" required>
                   <small class="form-text">Enter your best bid amount. This will be recorded on the blockchain and cannot be modified later.</small>
+                </div>
+                
+                <div class="form-group">
+                  <label for="companyName"><i class="fas fa-building"></i> Company Name</label>
+                  <input type="text" name="companyName" id="companyName" class="form-control" placeholder="Enter your company name" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="contactPerson"><i class="fas fa-user"></i> Contact Person</label>
+                  <input type="text" name="contactPerson" id="contactPerson" class="form-control" placeholder="Enter contact person name" required>
+                </div>
+                
+                <div class="form-row">
+                  <div class="form-group col-md-6">
+                    <label for="contactEmail"><i class="fas fa-envelope"></i> Email Address</label>
+                    <input type="email" name="contactEmail" id="contactEmail" class="form-control" placeholder="Enter email address" required>
+                  </div>
+                  <div class="form-group col-md-6">
+                    <label for="contactPhone"><i class="fas fa-phone"></i> Phone Number</label>
+                    <input type="text" name="contactPhone" id="contactPhone" class="form-control" placeholder="Enter phone number" required>
+                  </div>
+                </div>
+                
+                <div class="form-group">
+                  <label for="completionTime"><i class="fas fa-calendar-check"></i> Estimated Completion Time (days)</label>
+                  <input type="number" name="completionTime" id="completionTime" class="form-control" min="1" placeholder="Enter estimated completion time in days" required>
+                </div>
+                
+                <div class="form-group">
+                  <label for="proposalDetails"><i class="fas fa-file-alt"></i> Proposal Details</label>
+                  <textarea name="proposalDetails" id="proposalDetails" class="form-control" rows="4" placeholder="Provide details of your implementation approach" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                  <label for="experience"><i class="fas fa-briefcase"></i> Relevant Experience</label>
+                  <textarea name="experience" id="experience" class="form-control" rows="3" placeholder="Describe your relevant experience for this tender" required></textarea>
                 </div>
                 
                 <div class="text-center button-group">
