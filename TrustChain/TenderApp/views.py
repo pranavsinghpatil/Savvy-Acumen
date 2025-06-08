@@ -1379,7 +1379,9 @@ def ViewTender(request):
                 except Exception:
                     pass
                     
-        # Now collect all bids
+        # Now collect all bids - this is the critical part
+        print(f"Looking for bids for user: {current_user}")
+        
         for i in range(len(blockchain.chain)):
             if i > 0:
                 try:
@@ -1390,7 +1392,15 @@ def ViewTender(request):
                     data = data[2:len(data)-1]
                     arr = data.split("#")
                     
-                    if arr[0] == "bidding" and arr[4] == current_user:
+                    # Debug output to help trace the issue
+                    if arr[0] == "bidding":
+                        print(f"Found bid record: {arr[0]} - Title: {arr[1]} - User: {arr[3]} (current: {current_user})")
+                        print(f"Full bid data format: {arr}")
+                    
+                    # Format from BidTenderActionPage: bidding#title#amount#user#Pending#company_name#...etc
+                    # We need to match the format correctly - user is in position 3
+                    if arr[0] == "bidding" and arr[3] == current_user:
+                        print(f"Found matching bid for {current_user} on tender {arr[1]}")
                         bids_found = True
                         tender_title = arr[1]
                         
@@ -1399,11 +1409,16 @@ def ViewTender(request):
                             edit_status = "requested"
                         if tender_title in edit_approvals:
                             edit_status = edit_approvals[tender_title]  # approved or rejected
-                        bid_status = getWinners(arr[1], arr[4])
+                        
+                        # Get bid status
+                        bid_status = getWinners(tender_title, current_user)
+                        print(f"Bid status for {tender_title}: {bid_status}")
+                        
                         # If status is empty, set to 'Pending'
                         if not bid_status:
                             bid_status = 'Pending'
-                            
+
+                        # Store bid info for display
                         if tender_title not in user_bids:
                             user_bids[tender_title] = {
                                 'amount': arr[2],
@@ -1415,51 +1430,45 @@ def ViewTender(request):
                     pass
         
         # Generate table rows from the collected data
-        for title, bid_info in user_bids.items():
-            status = bid_info['status']
-            
-            # Default to Pending if status is empty or None
-            if not status:
-                status = 'Pending'
+        for tender_title, bid_info in user_bids.items():
+            # Skip entries with 'Not Bid' status - we only want to show tenders the user has actually bid on
+            if bid_info['status'] == 'Not Bid':
+                continue
                 
-            # Set appropriate style based on status
-            if status == 'Winner':
-                status_class = 'success'
-                status_icon = 'trophy'
-            elif status == 'Lost':
-                status_class = 'warning'
-                status_icon = 'times-circle'
-            elif status == 'Closed':
-                status_class = 'secondary'
-                status_icon = 'lock'
-            else:  # Pending
-                status_class = 'info'
-                status_icon = 'hourglass'
+            badge_class = "badge-secondary"
+            icon_class = "fa-clock"
+            edit_action = ""
             
-            # Add action buttons based on status and edit_status
-            edit_status = bid_info.get('edit_status', 'none')
-            action_buttons = ''
+            if bid_info['status'] == 'Winner':
+                badge_class = "badge-success"
+                icon_class = "fa-trophy"
+            elif bid_info['status'] == 'Lost':
+                badge_class = "badge-danger"
+                icon_class = "fa-times-circle"
+            elif bid_info['status'] == 'Closed':
+                badge_class = "badge-info"
+                icon_class = "fa-lock"
+            elif bid_info['status'] == 'Pending':
+                badge_class = "badge-warning"
+                icon_class = "fa-hourglass"
             
-            if status == 'Pending':
-                if edit_status == 'none':
-                    # Show request edit button
-                    action_buttons = f'<a href="RequestBidEdit?title={title}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Request Edit</a>'
-                elif edit_status == 'requested':
-                    # Show pending request badge
-                    action_buttons = f'<span class="badge badge-warning"><i class="fas fa-clock"></i> Edit Requested</span>'
-                elif edit_status == 'approved':
-                    # Show edit button
-                    action_buttons = f'<a href="BidTenderAction?title={title}&edit=true" class="btn btn-sm btn-success"><i class="fas fa-pen"></i> Edit Bid</a>'
-                elif edit_status == 'rejected':
-                    # Show rejected badge
-                    action_buttons = f'<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Edit Rejected</span>'
+            # Add action buttons based on status
+            if bid_info['status'] == 'Pending':
+                if bid_info['edit_status'] == 'requested':
+                    edit_action = f'<button class="btn btn-sm btn-info" disabled><i class="fas fa-clock"></i> Edit Request Sent</button>'
+                elif bid_info['edit_status'] == 'approved':
+                    edit_action = f'<a href="/EditBidTenderAction?title={tender_title}" class="btn btn-sm btn-success"><i class="fas fa-pencil-alt"></i> Edit Bid Now</a>'
+                elif bid_info['edit_status'] == 'rejected':
+                    edit_action = f'<button class="btn btn-sm btn-danger" disabled><i class="fas fa-times-circle"></i> Edit Request Rejected</button>'
+                else:
+                    edit_action = f'<a href="/RequestBidEdit?title={tender_title}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Request Edit</a>'
             
             output += f'<tr>'
-            output += f'<td>{title}</td>'
+            output += f'<td>{tender_title}</td>'
             output += f'<td>{bid_info["amount"]}</td>'
             output += f'<td>{current_user}</td>'
-            output += f'<td><span class="badge badge-{status_class}"><i class="fas fa-{status_icon}"></i> {status}</span></td>'
-            output += f'<td>{action_buttons}</td>'
+            output += f'<td><span class="badge {badge_class}"><i class="fas {icon_class}"></i> {bid_info["status"]}</span></td>'
+            output += f'<td>{edit_action}</td>'
             output += f'</tr>'
         
         output += '</tbody></table>'
@@ -1570,14 +1579,20 @@ def getWinner(title):
     return output
 
 def getWinners(title, bidder):
+    """Get the status of a bid for a specific user and tender"""
+    # Ensure blockchain cache is initialized
+    global _blockchain_cache
+    ensure_blockchain_cache_initialized()
+    
     # Default status is Pending
     output = 'Pending'
     winner_exists = False
     winner_is_current_bidder = False
     is_closed = False
+    found_tender = False
     
-    # First check if tender is closed
-    for i in range(len(blockchain.chain)):
+    # First check if tender has a declared winner (search backwards for efficiency)
+    for i in range(len(blockchain.chain)-1, -1, -1):
         if i > 0:
             try:
                 b = blockchain.chain[i]
@@ -1587,41 +1602,58 @@ def getWinners(title, bidder):
                 data = data[2:len(data)-1]
                 arr = data.split("#")
                 
-                # Check if this is the tender we're looking for
-                if arr[0] == "tender" and arr[1] == title:
-                    # Format: tender#title#description#open_date#close_date#amt#industry#category#location#eligibility#specifications
-                    close_date = arr[4]
-                    
-                    # Parse close date
-                    close_dt = None
-                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
-                        try:
-                            close_dt = datetime.strptime(close_date, fmt)
-                            break
-                        except:
-                            continue
-                    
-                    # Check if tender is closed
-                    if close_dt and close_dt < datetime.now():
-                        is_closed = True
-                        
-                # Check if there's a winner for this tender
+                # Check for winner declaration
                 if arr[0] == "winner" and arr[1] == title:
                     winner_exists = True
-                    if arr[4] == bidder:
+                    winning_username = arr[4] # Winner username is in position 4
+                    if winning_username == bidder:
                         winner_is_current_bidder = True
-            except:
+                    break
+            except Exception as e:
+                print(f"Error checking winner for {title}: {str(e)}")
                 pass
-
-    # Determine final status
-    if is_closed and not winner_exists:
-        output = "Closed"
-    elif winner_exists:
+    
+    # If no winner found, check if tender is closed by date
+    if not winner_exists:
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "tender" and arr[1] == title:
+                        found_tender = True
+                        close_date = arr[4]
+                        close_dt = None
+                        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                            try:
+                                close_dt = datetime.datetime.strptime(close_date, fmt)
+                                break
+                            except:
+                                continue
+                        if close_dt and close_dt < datetime.datetime.now():
+                            is_closed = True
+                        break
+                except Exception as e:
+                    print(f"Error checking tender close date for {title}: {str(e)}")
+                    pass
+    
+    # We no longer need to check if the user placed a bid since we're only calling this
+    # function for tenders the user has already bid on
+    if winner_exists:
         if winner_is_current_bidder:
             output = "Winner"
         else:
             output = "Lost"
-            
+    elif is_closed:
+        output = "Closed"
+    else:
+        output = "Pending"
+        
     return output
 
 def EvaluateTender(request):
