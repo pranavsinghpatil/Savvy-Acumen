@@ -68,6 +68,7 @@
         <li><a href="{% url 'CreateTender' %}"><i class="fas fa-file-contract"></i> Create Tender</a></li>
         <li><a href="{% url 'EvaluateTender' %}"><i class="fas fa-tasks"></i> Evaluate & Negotiate</a></li>
         <li><a href="{% url 'WinnerSelection' %}"><i class="fas fa-trophy"></i> Winner Selection</a></li>
+        <li><a href="{% url 'OfficerNotifications' %}"><i class="fas fa-bell" style="color:#0056b3;"></i> Notifications</a></li>
         <li><a href="{% url 'index' %}"><i class="fas fa-sign-out-alt"></i> Logout</a></li>
       </ul>
     </div>
@@ -171,7 +172,7 @@
                       {% endif %}
                     </td>
                     <td>{{ tender.amount }}</td>
-                    <td>{% if tender.winner %}{{ tender.winner }}{% else %}-{% endif %}</td>
+                    <td>{% if tender.status == 'Awarded' %}{{ tender.winner }}{% else %}-{% endif %}</td>
                   </tr>
                   {% endfor %}
                 </tbody>

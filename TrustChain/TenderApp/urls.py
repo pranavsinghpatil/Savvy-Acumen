@@ -7,9 +7,13 @@ from . import views
 from .views import OfficerOngoingTenders
 
 urlpatterns = [
+    path('Login/', views.Login, name='Login'),
+    path('clear-data/', views.ClearTenderData, name='ClearTenderData'),
     path('TenderScreen', views.TenderScreen, name='TenderScreen'),
     path('BidderScreen', views.BidderScreen, name='BidderScreen'),
     path('BidderNotifications', views.BidderNotifications, name='BidderNotifications'),
+    path('OfficerNotifications', views.OfficerNotifications, name='OfficerNotifications'),
+    path('OfficerViewTenders', views.ViewTender, name='OfficerViewTenders'),
     path('officer/ongoing-tenders/', OfficerOngoingTenders, name='OfficerOngoingTenders'),
     path('EditTender/<str:tender_title>', views.EditTender, name='EditTender'),
     path('DeleteTender', views.DeleteTender, name='DeleteTender'),

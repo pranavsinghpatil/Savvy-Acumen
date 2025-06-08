@@ -463,7 +463,26 @@ def OfficerNotifications(request):
         }
         return render(request, 'OfficerNotifications.html', context)
 
-def OfficerOngoingTenders(request):
+def get_cached_officer_tenders():
+    """Get cached tender data for officer with optimized performance"""
+    global _blockchain_cache
+    cache_key = 'officer_tender_data'
+    
+    # Initialize cache counters if they don't exist
+    if 'cache_hits' not in _blockchain_cache:
+        _blockchain_cache['cache_hits'] = 0
+    if 'cache_misses' not in _blockchain_cache:
+        _blockchain_cache['cache_misses'] = 0
+    
+    if not should_update_cache() and cache_key in _blockchain_cache.get('tender_data', {}):
+        _blockchain_cache['cache_hits'] += 1
+        return _blockchain_cache['tender_data'][cache_key]
+    
+    # Initialize tender_data if it doesn't exist
+    if 'tender_data' not in _blockchain_cache:
+        _blockchain_cache['tender_data'] = {}
+    
+    _blockchain_cache['cache_misses'] += 1
     from datetime import datetime
     tenders = []
     closed_tenders = []
@@ -473,145 +492,211 @@ def OfficerOngoingTenders(request):
     now = datetime.now()
     debug_log.append(f"Current server time: {now}")
     
-    # Collect all winner titles and their info
+    # Single blockchain scan for efficiency - collect all data in one pass
     for i in range(len(blockchain.chain)):
         if i > 0:
-            b = blockchain.chain[i]
-            data = b.transactions[0]
-            data = base64.b64decode(data)
-            data = str(decrypt(data))
-            data = data[2:len(data)-1]
-            arr = data.split("#")
-            if arr[0] == "winner":
-                tender_title = arr[1]
-                winner_titles.add(tender_title)
-                # Store bidder name and amount if available
-                # Parse the winner information correctly
-                if len(arr) >= 4:
-                    # Format the amount properly (handle large numbers)
-                    try:
-                        amount = float(arr[2])
-                        if amount > 1000000000:  # If over a billion
-                            formatted_amount = f"{amount:.2f}".rstrip('0').rstrip('.')
-                        else:
-                            formatted_amount = arr[2]
-                    except ValueError:
-                        formatted_amount = arr[2]
-                        
-                    winner_info[tender_title] = {
-                        'bidder': arr[3],     # Winner name is in position 3
-                        'amount': formatted_amount  # Amount is in position 2, with better formatting
-                    }
-                else:
-                    winner_info[tender_title] = {
-                        'bidder': 'Selected',
-                        'amount': 'Not recorded'
-                    }
-    debug_log.append(f"Winner titles: {winner_titles}")
-    debug_log.append(f"Winner info: {winner_info}")
-
-    # Collect ongoing tenders
-    for i in range(len(blockchain.chain)):
-        if i > 0:
-            b = blockchain.chain[i]
-            data = b.transactions[0]
-            data = base64.b64decode(data)
-            data = str(decrypt(data))
-            data = data[2:len(data)-1]
-            arr = data.split("#")
-            if arr[0] == "tender":
-                title = arr[1]
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
                 
-                # Check if it's a deleted tender
-                if is_tender_deleted(title):
-                    debug_log.append(f"Skipping deleted tender: {title}")
-                    continue
+                # Collect winner information
+                if arr[0] == "winner":
+                    tender_title = arr[1]
+                    winner_titles.add(tender_title)
+                    # Store bidder name and amount if available
+                    if len(arr) >= 4:
+                        # Format the amount properly
+                        try:
+                            amount = float(arr[2])
+                            if amount > 1000000000:  # If over a billion
+                                formatted_amount = f"{amount:.2f}".rstrip('0').rstrip('.')
+                            else:
+                                formatted_amount = arr[2]
+                        except ValueError:
+                            formatted_amount = arr[2]
+                            
+                        winner_info[tender_title] = {
+                            'bidder': arr[3],
+                            'amount': formatted_amount
+                        }
+                    else:
+                        winner_info[tender_title] = {
+                            'bidder': 'Selected',
+                            'amount': 'Not recorded'
+                        }
+            except Exception as e:
+                # Log error but continue processing other entries
+                debug_log.append(f"Error processing blockchain entry {i}: {str(e)}")
+    
+    # Special cases lookup dictionaries
+    deleted_tenders = {}
+    early_closed_tenders = {}
+    
+    # Pre-collect special cases
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                # Check for deletion entries
+                if arr[0] == "delete" and len(arr) >= 2:
+                    deleted_tenders[arr[1]] = True
                     
-                # Check if the tender was manually closed early
-                closed_early, close_early_date = is_tender_closed_early(title)
-                if closed_early:
-                    debug_log.append(f"Tender {title} was manually closed on {close_early_date}")
+                # Check for early closure entries
+                if arr[0] == "close" and len(arr) >= 3:
+                    early_closed_tenders[arr[1]] = arr[2]  # tender title -> close date
+            except Exception:
+                pass
+    
+    # Collect tenders in a single pass
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                if arr[0] == "tender":
+                    title = arr[1]
+                    
+                    # Skip deleted tenders
+                    if title in deleted_tenders:
+                        continue
+                        
+                    description = arr[2]
+                    open_date = arr[3]
+                    close_date = arr[4]
+                    amount = arr[5]
+                    open_dt = None
+                    close_dt = None
+                    
+                    # Parse dates
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            open_dt = datetime.strptime(open_date, fmt)
+                            break
+                        except Exception:
+                            continue
+                    if open_dt is None:
+                        continue
+                        
+                    for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
+                        try:
+                            close_dt = datetime.strptime(close_date, fmt)
+                            break
+                        except Exception:
+                            continue
+                    if close_dt is None:
+                        continue
+                        
+                    # Prepare tender data
                     tender_data = {
                         'title': title,
                         'description': description,
                         'open_date': open_date,
-                        'close_date': close_early_date,  # Use the manual close date
-                        'amount': amount,
-                        'status': 'Closed Early'
+                        'close_date': close_date,
+                        'amount': amount
                     }
-                    closed_tenders.append(tender_data)
-                    continue
                     
-                description = arr[2]
-                open_date = arr[3]
-                close_date = arr[4]
-                amount = arr[5]
-                open_dt = None
-                close_dt = None
-                open_fmt = close_fmt = None
-                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
-                    try:
-                        open_dt = datetime.strptime(open_date, fmt)
-                        open_fmt = fmt
-                        break
-                    except Exception:
+                    # Check for early closure
+                    if title in early_closed_tenders:
+                        tender_data['status'] = 'Closed Early'
+                        tender_data['close_date'] = early_closed_tenders[title]
+                        closed_tenders.append(tender_data)
                         continue
-                if open_dt is None:
-                    debug_log.append(f"[ERROR] Could not parse open_date: {open_date} for tender '{title}'")
-                    continue
-                for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
-                    try:
-                        close_dt = datetime.strptime(close_date, fmt)
-                        close_fmt = fmt
-                        break
-                    except Exception:
-                        continue
-                if close_dt is None:
-                    debug_log.append(f"[ERROR] Could not parse close_date: {close_date} for tender '{title}'")
-                    continue
-                # For closed or awarded tenders
-                tender_data = {
-                    'title': title,
-                    'description': description,
-                    'open_date': open_date,
-                    'close_date': close_date,
-                    'amount': amount
-                }
-                
-                # Check if it's an awarded tender
-                if title in winner_titles:
-                    debug_log.append(f"Tender '{title}' has a winner - adding to closed tenders list.")
-                    tender_data['status'] = 'Awarded'
-                    tender_data['winner'] = winner_info.get(title, {}).get('bidder', 'Selected')
-                    tender_data['winning_amount'] = winner_info.get(title, {}).get('amount', 'Not recorded')
-                    closed_tenders.append(tender_data)
-                    continue
                     
-                # Check if it's a closed tender without winner
-                if close_dt < now:
-                    debug_log.append(f"Tender '{title}' is closed (close_date: {close_date}, parsed: {close_dt}, now: {now}).")  
-                    tender_data['status'] = 'Closed'
-                    closed_tenders.append(tender_data)
-                    continue
-                
-                # Add a flag to indicate if the tender is not yet open but still viewable
-                is_future = open_dt > now
-                tenders.append({
-                    'title': title,
-                    'description': description,
-                    'open_date': open_date,
-                    'close_date': close_date,
-                    'amount': amount,
-                    'is_future': is_future
-                })
-                debug_log.append(f"Tender '{title}' added: open_date {open_date} ({open_fmt}), close_date {close_date} ({close_fmt}).")
-    debug_log.append(f"Total ongoing tenders found: {len(tenders)}")
-    debug_log.append(f"Total closed/awarded tenders found: {len(closed_tenders)}")
-    context = {
-        'tenders': tenders, 
+                    # Check if awarded
+                    if title in winner_titles:
+                        tender_data['status'] = 'Awarded'
+                        tender_data['winner'] = winner_info.get(title, {}).get('bidder', 'Selected')
+                        tender_data['winning_amount'] = winner_info.get(title, {}).get('amount', 'Not recorded')
+                        closed_tenders.append(tender_data)
+                        continue
+                        
+                    # Check if closed
+                    if close_dt < now:
+                        tender_data['status'] = 'Closed'
+                        closed_tenders.append(tender_data)
+                        continue
+                    
+                    # It's an ongoing tender
+                    is_future = open_dt > now
+                    tender_data['is_future'] = is_future
+                    tenders.append(tender_data)
+            except Exception as e:
+                # Log error but continue processing other entries
+                debug_log.append(f"Error parsing tender data: {str(e)}")
+                continue
+    
+    # Store results in cache
+    result = {
+        'tenders': tenders,
         'closed_tenders': closed_tenders,
         'debug_log': debug_log
     }
+    
+    _blockchain_cache['tender_data'][cache_key] = result
+    return result
+
+def OfficerOngoingTenders(request):
+    """Display ongoing tenders with optimized loading using cache"""
+    # Get cached data
+    data = get_cached_officer_tenders()
+    
+    # Add notification counts for the template
+    current_user = get_current_user()
+    unread_count = get_unread_notifications_count(current_user)
+    
+    # Sort tenders by date (newest first)
+    from datetime import datetime as dt
+    tenders = data['tenders']
+    closed_tenders = data['closed_tenders']
+    
+    # Helper function to safely parse dates in different formats
+    def safe_parse_date(date_str):
+        formats = ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"]
+        for fmt in formats:
+            try:
+                return dt.strptime(date_str, fmt)
+            except (ValueError, TypeError):
+                continue
+        # If all parsing attempts fail, return a very old date as default
+        return dt(2000, 1, 1)  # Default to a very old date if parsing fails
+    
+    # Sort ongoing tenders by close_date (most recent closing date first)
+    try:
+        tenders.sort(key=lambda x: safe_parse_date(x['close_date']), reverse=True)
+    except Exception as e:
+        # If sorting fails for any reason, log it but don't crash
+        print(f"Error sorting ongoing tenders: {str(e)}")
+    
+    # Sort closed tenders by close_date (newest closed first)
+    try:
+        closed_tenders.sort(key=lambda x: safe_parse_date(x['close_date']), reverse=True)
+    except Exception as e:
+        # If sorting fails for any reason, log it but don't crash
+        print(f"Error sorting closed tenders: {str(e)}")
+    
+    # Limit closed tenders to the 10 most recent
+    limited_closed_tenders = closed_tenders[:10]
+    
+    # Prepare context
+    context = data.copy()
+    context['tenders'] = tenders
+    context['closed_tenders'] = limited_closed_tenders
+    context['unread_count'] = unread_count
     return render(request, 'OfficerOngoingTenders.html', context)
 
 
@@ -725,13 +810,84 @@ def Logout(request):
     if request.method == 'GET':
        return render(request, 'index.html', {})        
 
+def Login(request):
+    if request.method == 'GET':
+       return render(request, 'Login.html', {})
+       
+
+def ClearTenderData(request):
+    """Clears all tender data from the blockchain while preserving account credentials."""
+    if request.method == 'GET':
+        return render(request, 'admin/clear_data.html', {'message': 'Click the button to clear all tender data. Account information will be preserved.'})
+    
+    elif request.method == 'POST':
+        try:
+            # Load the original blockchain
+            original_blockchain = None
+            if os.path.exists('blockchain_contract.txt'):
+                with open('blockchain_contract.txt', 'rb') as fileinput:
+                    original_blockchain = pickle.load(fileinput)
+                fileinput.close()
+            else:
+                return render(request, 'admin/clear_data.html', {'error': 'No blockchain data found!'})
+            
+            # Create a new blockchain with only the genesis block
+            new_blockchain = Blockchain()
+            
+            # Keep track of accounts found
+            accounts = []
+            
+            # Go through each block and only keep signup records
+            for i in range(len(original_blockchain.chain)):
+                if i == 0:
+                    # This is the genesis block, already in the new blockchain
+                    continue
+                    
+                try:
+                    b = original_blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "signup":
+                        # This is a signup record, add it to the new blockchain
+                        username = arr[1]
+                        accounts.append(username)
+                        
+                        # Add this transaction to the new blockchain
+                        enc = encrypt(str(data))
+                        enc = str(base64.b64encode(enc),'utf-8')
+                        new_blockchain.add_new_transaction(enc)
+                        hash = new_blockchain.mine()
+                except:
+                    continue
+            
+            # Save the new blockchain
+            new_blockchain.save_object(new_blockchain, 'blockchain_contract.txt')
+            
+            # Create success message showing preserved accounts
+            message = f"Data cleanup complete! Preserved {len(accounts)} user accounts:<br/>"
+            message += "<ul>"
+            for account in accounts:
+                message += f"<li>{account}</li>"
+            message += "</ul>"
+            
+            return render(request, 'admin/clear_data.html', {'success': message})
+            
+        except Exception as e:
+            error_message = f"Error during data cleanup: {str(e)}"
+            return render(request, 'admin/clear_data.html', {'error': error_message})
+
+# Keep these for backward compatibility
 def TenderLogin(request):
     if request.method == 'GET':
-       return render(request, 'TenderLogin.html', {})
+       return redirect('Login')
 
 def BidderLogin(request):
     if request.method == 'GET':
-       return render(request, 'BidderLogin.html', {})    
+       return redirect('Login')    
     
 def Register(request):
     if request.method == 'GET':
@@ -1652,6 +1808,23 @@ def CreateTenderAction(request):
         return render(request, 'CreateTender.html', context)
         
 
+def checkCompanyName(company_name):
+    """Check if a company name already exists in the blockchain"""
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                if arr[0] == "signup" and arr[5] == company_name:
+                    return 'exists'
+            except:
+                pass
+    return 'none'
+
 def Signup(request):
     if request.method == 'POST':
         username = request.POST.get('username', False)
@@ -1660,8 +1833,13 @@ def Signup(request):
         email = request.POST.get('email', False)
         cname = request.POST.get('cname', False)
         address = request.POST.get('address', False)
-        check = checkUser(username)
-        if check == 'none':
+        
+        # Check for duplicate username
+        check_username = checkUser(username)
+        # Check for duplicate company name
+        check_company = checkCompanyName(cname)
+        
+        if check_username == 'none' and check_company == 'none':
             data = "signup#"+username+"#"+password+"#"+contact+"#"+email+"#"+cname+"#"+address
             enc = encrypt(str(data))
             enc = str(base64.b64encode(enc),'utf-8')
@@ -1671,10 +1849,19 @@ def Signup(request):
             print("Previous Hash : "+str(b.previous_hash)+" Block No : "+str(b.index)+" Current Hash : "+str(b.hash))
             bc = "Previous Hash : "+str(b.previous_hash)+"<br/>Block No : "+str(b.index)+"<br/>Current Hash : "+str(b.hash)
             blockchain.save_object(blockchain,'blockchain_contract.txt')
-            context= {'data':'Signup process completd and record saved in Blockchain with below hashcodes.<br/>'+bc}
+            context= {'data':'Signup process completed and record saved in Blockchain with below hashcodes.<br/>'+bc}
             return render(request, 'Register.html', context)
         else:
-            context= {'data':'Username already exists'}
+            # Provide specific error message based on what's duplicated
+            error_msg = ''
+            if check_username != 'none':
+                error_msg = 'Username already exists. Please choose a different username.'
+            elif check_company != 'none':
+                error_msg = 'Company name already exists. Please use a different company name.'
+            else:
+                error_msg = 'Registration failed. Please try again.'
+                
+            context= {'data': error_msg}
             return render(request, 'Register.html', context)
 
 
@@ -1682,12 +1869,14 @@ def TenderLoginAction(request):
     if request.method == 'POST':
         username = request.POST.get('username', False)
         password = request.POST.get('password', False)
+        account_type = request.POST.get('account_type', 'officer')
+        
         if username == 'admin' and password == 'admin':
             context= {'data':'Welcome '+username}
             return render(request, 'TenderScreen.html', context)
         else:
             context= {'data':'Invalid Login'}
-            return render(request, 'TenderLogin.html', context)
+            return render(request, 'Login.html', context)
             
 
 
@@ -1695,6 +1884,7 @@ def BidderLoginAction(request):
     if request.method == 'POST':
         username = request.POST.get('username', False)
         password = request.POST.get('password', False)
+        account_type = request.POST.get('account_type', 'bidder')
         status = 'none'
         for i in range(len(blockchain.chain)):
             if i > 0:
@@ -1709,14 +1899,17 @@ def BidderLoginAction(request):
                         status = 'success'
                         break
         if status == 'success':
+            # Store in both session and file for compatibility
             file = open('session.txt','w')
             file.write(username)
             file.close()
+            request.session['username'] = username
+            request.session.modified = True
             context= {'data':"Welcome "+username}
             return render(request, 'BidderScreen.html', context)
         else:
             context= {'data':'Invalid login details'}
-            return render(request, 'BidderLogin.html', context)
+            return render(request, 'Login.html', context)
         
         
 

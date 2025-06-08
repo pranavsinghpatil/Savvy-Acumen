@@ -1022,8 +1022,17 @@ form {
 }
 
 /* Table backgrounds */
-table, th, td {
+table, td {
   background: #ffffff !important;
+}
+
+/* Blue background for table headers */
+table thead th {
+  background: #0056b3 !important;
+  color: white !important;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 0.9rem;
 }
 
 

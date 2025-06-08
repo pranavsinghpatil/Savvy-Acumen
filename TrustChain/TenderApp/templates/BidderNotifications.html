@@ -195,39 +195,43 @@
     <div class="container">
       <div class="row">
         <div class="col-12">
-          <h2 class="page-title mb-4" style="color: #18c964;"><i class="fas fa-bell"></i> Notifications</h2>
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-md-3">
-          <button id="mark-all-read" class="btn action-btn btn-block mb-4" onclick="markAllRead()">
-            <i class="fas fa-check-double"></i> Mark all as read
-          </button>
-        </div>
-        <div class="col-md-9">
-          <div class="welcome-banner mb-4">
-            <div class="welcome-avatar">
-              <i class="fas fa-user-circle"></i>
-            </div>
-            <div class="welcome-text">
-              <h3>Welcome to your Notifications</h3>
-              <p>Stay updated on your tender bidding status changes and important announcements.</p>
-            </div>
-          </div>
           <div class="card mb-4">
-            <div class="card-title">
-              <h3>Recent Updates</h3>
+            <div class="card-title" style="background-color:#0056b3; color:white; padding:15px; border-radius: 5px 5px 0 0;">
+              <h3 style="margin:0;"><i class="fas fa-bell"></i> Your Notifications</h3>
             </div>
             <div class="card-body">
-              {% if notifications %}
-              <ul class="notification-list">
-                {{ notifications|safe }}
-              </ul>
-              {% else %}
-              <div class="alert alert-info">
-                <i class="fas fa-info-circle"></i> No new notifications at the moment. Check back later for updates on your bids.
+              <div class="row mb-3">
+                <div class="col-md-9">
+                  <div class="welcome-banner">
+                    <div class="welcome-avatar">
+                      <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="welcome-text">
+                      <h4>Stay updated on your tender bidding status</h4>
+                      <p>Important announcements and bid status changes appear here.</p>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-3 text-right">
+                  <button id="mark-all-read" class="btn btn-primary" onclick="markAllRead()" style="background-color: #18c964; border-color: #18c964;">
+                    <i class="fas fa-check-double"></i> Mark all as read
+                  </button>
+                </div>
               </div>
-              {% endif %}
+              
+              <div class="notifications-container">
+                {% if notifications %}
+                <ul class="notification-list">
+                  {{ notifications|safe }}
+                </ul>
+                {% else %}
+                <div class="empty-state">
+                  <i class="fas fa-bell-slash"></i>
+                  <h4>No new notifications</h4>
+                  <p>Check back later for updates on your bids and tender activities.</p>
+                </div>
+                {% endif %}
+              </div>
             </div>
           </div>
         </div>
