@@ -9,9 +9,41 @@
 <link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 <script type="text/javascript">
+// Page load overlay handling
+window.addEventListener('load', function() {
+  // Get the initial loading overlay element
+  var pageLoadOverlay = document.getElementById('page-loading-overlay');
+  
+  // Add a class to fade out the loading overlay
+  setTimeout(function() {
+    pageLoadOverlay.classList.add('fade-out');
+    
+    // Hide and remove the overlay after the fade animation completes
+    setTimeout(function() {
+      pageLoadOverlay.style.display = 'none';
+    }, 500);
+  }, 500);
+});
+
+// Set the loading overlay to be visible by default
+document.write('<style>#page-loading-overlay{display:flex;}</style>');
+
+// Form submission overlay handling
 function showLoading() {
-  document.getElementById('loadingOverlay').style.display = 'flex';
+  document.getElementById('submission-overlay').style.display = 'flex';
   document.getElementById('submitButton').disabled = true;
+  
+  // Animate the progress bar
+  var progressBar = document.getElementById('submission-progress');
+  var width = 0;
+  var interval = setInterval(function() {
+    if (width >= 95) {
+      clearInterval(interval);
+    } else {
+      width += 0.5;
+      progressBar.style.width = width + '%';
+    }
+  }, 50);
 }
 
 function validateBid() {
@@ -82,6 +114,30 @@ function validateBid() {
 </script>
 </head>
 <body>
+<!-- Initial Page Loading Overlay -->
+<div id="page-loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Loading Tender Details...</h3>
+    <p>Please wait while we securely retrieve tender information from the blockchain</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="loading-progress"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Form Submission Loading Overlay -->
+<div id="submission-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Processing Your Bid</h3>
+    <p>Please wait while we securely record your bid on the blockchain. This ensures immutability and transparency in the bidding process.</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="submission-progress"></div>
+    </div>
+  </div>
+</div>
+
 <div id="wrapper">
   <div id="header">
     <div class="container">

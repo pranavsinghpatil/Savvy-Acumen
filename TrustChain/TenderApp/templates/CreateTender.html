@@ -7,6 +7,43 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
 <link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
+
+<script>
+  // Show loading overlay on page load
+  window.addEventListener('load', function() {
+    var loadingOverlay = document.getElementById('loading-overlay');
+    
+    setTimeout(function() {
+      loadingOverlay.classList.add('fade-out');
+      
+      setTimeout(function() {
+        loadingOverlay.style.display = 'none';
+      }, 500);
+    }, 500);
+  });
+  
+  // Set form submission overlay handling
+  function showSubmissionOverlay() {
+    document.getElementById('submission-overlay').style.display = 'flex';
+    
+    // Animate the progress bar
+    var progressBar = document.getElementById('submission-progress');
+    var width = 0;
+    var interval = setInterval(function() {
+      if (width >= 95) {
+        clearInterval(interval);
+      } else {
+        width += 0.5;
+        progressBar.style.width = width + '%';
+      }
+    }, 50);
+    
+    return true; // Allow the form to submit
+  }
+  
+  // Set the loading overlay to be visible by default
+  document.write('<style>#loading-overlay{display:flex;}</style>');
+</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
  <script LANGUAGE="Javascript" >
 function validate(){
@@ -73,6 +110,30 @@ function validate(){
 
 </head>
 <body>
+<!-- Initial Page Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Loading Create Tender Form...</h3>
+    <p>Please wait while we initialize the tender creation interface</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="loading-progress"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Form Submission Loading Overlay -->
+<div id="submission-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Creating Tender</h3>
+    <p>Please wait while we securely record your tender on the blockchain. This ensures immutability and transparency in the tender process.</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="submission-progress"></div>
+    </div>
+  </div>
+</div>
+
 <div id="wrapper">
   <div id="header">
     <div class="container">
@@ -115,7 +176,7 @@ function validate(){
               <div class="card-title">
                 <h3>Tender Details</h3>
               </div>
-              <form name="f1" method="post" action={% url 'CreateTenderAction' %} onsubmit="return validate()">
+              <form name="f1" action="{% url 'CreateTenderAction' %}" method="POST" onsubmit="if(validate()) { return showSubmissionOverlay(); } else { return false; }">
                 {% csrf_token %}
                 
                 <div class="form-group">

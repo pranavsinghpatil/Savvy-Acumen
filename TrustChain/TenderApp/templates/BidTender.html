@@ -11,13 +11,24 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 
 <script>
-  // Show loading overlay immediately when page starts loading
-  document.addEventListener('DOMContentLoaded', function() {
-    // Hide loading overlay when content is fully loaded
+  // Show loading overlay immediately when page loads
+  window.addEventListener('load', function() {
+    // Get the loading overlay element
+    var loadingOverlay = document.getElementById('loading-overlay');
+    
+    // Add a class to fade out the loading overlay
     setTimeout(function() {
-      document.getElementById('loading-overlay').style.display = 'none';
-    }, 500); // Small delay to ensure smooth transition
+      loadingOverlay.classList.add('fade-out');
+      
+      // Hide and remove the overlay after the fade animation completes
+      setTimeout(function() {
+        loadingOverlay.style.display = 'none';
+      }, 500);
+    }, 500); // Delay to ensure content is ready and progress bar animation has advanced
   });
+  
+  // Set the loading overlay to be visible by default (in case JS is disabled)
+  document.write('<style>#loading-overlay{display:flex;}</style>');
 </script>
 
 <style>/* This comment is now inside the style tag */
@@ -40,11 +51,12 @@
 <body>
 <!-- Loading Overlay -->
 <div id="loading-overlay" class="loading-overlay">
-  <div class="loading-content">
-    <div class="loading-spinner"></div>
-    <div class="loading-text">
-      <h3>Loading Tenders...</h3>
-      <p>Please wait while we securely retrieve tender information from the blockchain</p>
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Loading Tenders...</h3>
+    <p>Please wait while we securely retrieve tender information from the blockchain</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="loading-progress"></div>
     </div>
   </div>
 </div>

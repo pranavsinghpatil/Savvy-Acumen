@@ -8,8 +8,41 @@
 <link href="{% static 'trustchain.css' %}" rel="stylesheet" type="text/css" media="screen" />
 <link href="{% static 'footer.css' %}" rel="stylesheet" type="text/css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+
+<script>
+  // Show loading overlay immediately when page loads
+  window.addEventListener('load', function() {
+    // Get the loading overlay element
+    var loadingOverlay = document.getElementById('loading-overlay');
+    
+    // Add a class to fade out the loading overlay
+    setTimeout(function() {
+      loadingOverlay.classList.add('fade-out');
+      
+      // Hide and remove the overlay after the fade animation completes
+      setTimeout(function() {
+        loadingOverlay.style.display = 'none';
+      }, 500);
+    }, 500); // Delay to ensure content is ready and progress bar animation has advanced
+  });
+  
+  // Set the loading overlay to be visible by default
+  document.write('<style>#loading-overlay{display:flex;}</style>');
+</script>
 </head>
 <body>
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay">
+  <div class="spinner"></div>
+  <div class="loading-text">
+    <h3>Loading Tender Evaluation Data...</h3>
+    <p>Please wait while we retrieve and decrypt bid information from the blockchain for winner selection</p>
+    <div class="progress-container">
+      <div class="progress-bar" id="loading-progress"></div>
+    </div>
+  </div>
+</div>
+
 <div id="wrapper">
   <div id="header">
     <div class="container">
