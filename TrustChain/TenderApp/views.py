@@ -1,31 +1,324 @@
 from django.shortcuts import render, redirect
 from django.template import RequestContext
+import base64
+from datetime import datetime
+import time
+import json
+from django.http import HttpResponse
+from django.core.files.storage import FileSystemStorage
+import os
+from Blockchain import *
+import datetime
+
+# Initialize blockchain
+blockchain = Blockchain()
+if os.path.exists('blockchain_contract.txt'):
+    with open('blockchain_contract.txt', 'rb') as fileinput:
+        blockchain = pickle.load(fileinput)
+    fileinput.close()
+
+# Cache storage for blockchain data to improve performance
+_blockchain_cache = {
+    'user_notifications': {},  # Cache notification counts by user
+    'tender_data': {},        # Cache tender data
+    'bid_data': {},           # Cache bid data
+    'last_chain_length': 0,   # Track chain length to detect changes
+    'last_update': None,      # Timestamp of last cache update
+    'cache_hits': 0,          # Performance metrics
+    'cache_misses': 0
+}
 
 def TenderScreen(request):
     if request.method == 'GET':
         return render(request, 'TenderScreen.html', {})
 
+# Helper functions for cache management
+def should_update_cache():
+    """Determine if cache needs updating by checking blockchain length"""
+    global _blockchain_cache
+    current_length = len(blockchain.chain)
+    
+    # If chain length changed or cache is older than 30 seconds, update cache
+    current_time = datetime.datetime.now()
+    needs_update = (
+        current_length != _blockchain_cache['last_chain_length'] or
+        _blockchain_cache['last_update'] is None or
+        (current_time - _blockchain_cache['last_update']).total_seconds() > 30
+    )
+    
+    if needs_update:
+        _blockchain_cache['last_chain_length'] = current_length
+        _blockchain_cache['last_update'] = current_time
+    
+    return needs_update
+    
+# Helper functions for notifications and user management
+def get_current_user():
+    """Retrieve current user from session file"""
+    current_user = ''
+    try:
+        with open("session.txt", "r") as file:
+            for line in file:
+                current_user = line.strip('\n')
+        file.close()
+    except Exception:
+        pass
+    return current_user
+
+def update_notification_cache():
+    """Update the notification cache with data from blockchain"""
+    global _blockchain_cache
+    
+    # Reset notification counts
+    _blockchain_cache['user_notifications'] = {}
+    
+    # Scan blockchain for all notifications
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                # Check if this is a notification
+                if arr[0] == "notification" and len(arr) >= 5:
+                    username = arr[4]  # User the notification is for
+                    is_unread = arr[-1] == "unread"
+                    
+                    # Initialize user in cache if not present
+                    if username not in _blockchain_cache['user_notifications']:
+                        _blockchain_cache['user_notifications'][username] = 0
+                    
+                    # Increment unread count if notification is unread
+                    if is_unread:
+                        _blockchain_cache['user_notifications'][username] += 1
+            except Exception:
+                pass
+
+def get_unread_notifications_count(username):
+    """Get count of unread notifications for a user using cache when possible"""
+    global _blockchain_cache
+    
+    if not username:
+        return 0
+    
+    # Update cache if needed
+    if should_update_cache():
+        update_notification_cache()
+    
+    # Return cached count or 0 if user not in cache
+    return _blockchain_cache['user_notifications'].get(username, 0)
+
+def BidderNotifications(request):
+    """Notification page for bidders to view their notifications"""
+    if request.method == 'GET':
+        # Get current user from session
+        current_user = get_current_user()
+        
+        # Process mark as read if requested
+        notification_id = request.GET.get('mark_read', '')
+        if notification_id:
+            # Mark notification as read
+            try:
+                notification_id = int(notification_id)
+                for i in range(len(blockchain.chain)):
+                    if i > 0 and i == notification_id:
+                        b = blockchain.chain[i]
+                        data = b.transactions[0]
+                        data = base64.b64decode(data)
+                        data = str(decrypt(data))
+                        data = data[2:len(data)-1]
+                        arr = data.split("#")
+                        
+                        if arr[0] == "notification" and arr[-1] == "unread" and arr[4] == current_user:
+                            # Replace with read version
+                            new_data = data.replace("#unread", "#read")
+                            new_data = new_data.encode()
+                            new_data = base64.b64encode(encrypt(new_data))
+                            transaction = new_data.decode("utf-8")
+                            blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+                            break
+            except Exception as e:
+                print(f"Error marking notification as read: {str(e)}")
+                pass
+                
+        # Collect all notifications from blockchain
+        edit_approvals = []
+        edit_rejections = []
+        other_notifications = []
+        
+        # Count unread notifications
+        unread_count = 0
+        
+        # Scan blockchain for bidder notifications
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "notification" and len(arr) >= 5 and arr[4] == current_user:
+                        # This notification is for the current user
+                        notification_type = arr[1]
+                        # Check if notification is unread
+                        is_unread = arr[-1] == "unread"
+                        
+                        if is_unread:
+                            unread_count += 1
+                        
+                        if notification_type == "approve_edit":
+                            # Format: notification#approve_edit#tender_title#timestamp#bidder_name#unread/read
+                            edit_approvals.append({
+                                'id': i,
+                                'tender': arr[2],
+                                'timestamp': arr[3],
+                                'unread': is_unread
+                            })
+                        elif notification_type == "reject_edit":
+                            # Format: notification#reject_edit#tender_title#timestamp#bidder_name#unread/read
+                            edit_rejections.append({
+                                'id': i,
+                                'tender': arr[2],
+                                'timestamp': arr[3],
+                                'unread': is_unread
+                            })
+                        # Can add more notification types in the future
+                except Exception as e:
+                    print(f"Error processing bidder notification: {str(e)}")
+                    pass
+        
+        # Render the notifications template
+        context = {
+            'edit_approvals': edit_approvals,
+            'edit_rejections': edit_rejections,
+            'other_notifications': other_notifications,
+            'unread_count': unread_count
+        }
+        return render(request, 'BidderNotifications.html', context)
+
+# Cache storage for blockchain data to improve performance
+_blockchain_cache = {
+    'user_notifications': {},  # Cache notification counts by user
+    'tender_data': {},        # Cache tender data
+    'bid_data': {},           # Cache bid data
+    'last_chain_length': 0,   # Track chain length to detect changes
+    'last_update': None       # Timestamp of last cache update
+}
+
+# Helper functions for notifications and user management
+def get_current_user():
+    """Retrieve current user from session file"""
+    current_user = ''
+    try:
+        with open("session.txt", "r") as file:
+            for line in file:
+                current_user = line.strip('\n')
+        file.close()
+    except Exception:
+        pass
+    return current_user
+
+def should_update_cache():
+    """Determine if cache needs updating by checking blockchain length"""
+    global _blockchain_cache
+    current_length = len(blockchain.chain)
+    
+    # If chain length changed or cache is older than 30 seconds, update cache
+    current_time = datetime.datetime.now()
+    needs_update = (
+        current_length != _blockchain_cache['last_chain_length'] or
+        _blockchain_cache['last_update'] is None or
+        (current_time - _blockchain_cache['last_update']).total_seconds() > 30
+    )
+    
+    if needs_update:
+        _blockchain_cache['last_chain_length'] = current_length
+        _blockchain_cache['last_update'] = current_time
+    
+    return needs_update
+
+def update_notification_cache():
+    """Update the notification cache with data from blockchain"""
+    global _blockchain_cache
+    
+    # Reset notification counts
+    _blockchain_cache['user_notifications'] = {}
+    
+    # Scan blockchain for all notifications
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                # Check if this is a notification
+                if arr[0] == "notification" and len(arr) >= 5:
+                    username = arr[4]  # User the notification is for
+                    is_unread = arr[-1] == "unread"
+                    
+                    # Initialize user in cache if not present
+                    if username not in _blockchain_cache['user_notifications']:
+                        _blockchain_cache['user_notifications'][username] = 0
+                    
+                    # Increment unread count if notification is unread
+                    if is_unread:
+                        _blockchain_cache['user_notifications'][username] += 1
+            except Exception:
+                pass
+
+def get_unread_notifications_count(username):
+    """Get count of unread notifications for a user using cache when possible"""
+    global _blockchain_cache
+    
+    if not username:
+        return 0
+    
+    # Update cache if needed
+    if should_update_cache():
+        update_notification_cache()
+    
+    # Return cached count or 0 if user not in cache
+    return _blockchain_cache['user_notifications'].get(username, 0)
+
 def BidderScreen(request):
     if request.method == 'GET':
-        return render(request, 'BidderScreen.html', {})
+        # Get unread notification count for navbar badge
+        unread_count = get_unread_notifications_count(get_current_user())
+        return render(request, 'BidderScreen.html', {'unread_notification_count': unread_count})
 
 from django.contrib import messages
 from django.http import HttpResponse
 from django.core.files.storage import FileSystemStorage
 import os
 from Blockchain import *
-from Block import *
-from datetime import date
-import pyaes, pbkdf2, binascii, os, secrets
-import base64
-import numpy as np
-from django.shortcuts import render
+import datetime
 
+# Initialize blockchain
 blockchain = Blockchain()
 if os.path.exists('blockchain_contract.txt'):
     with open('blockchain_contract.txt', 'rb') as fileinput:
         blockchain = pickle.load(fileinput)
     fileinput.close()
+
+# Cache storage for blockchain data to improve performance
+_blockchain_cache = {
+    'user_notifications': {},  # Cache notification counts by user
+    'tender_data': {},        # Cache tender data
+    'bid_data': {},           # Cache bid data
+    'last_chain_length': 0,   # Track chain length to detect changes
+    'last_update': None       # Timestamp of last cache update
+}
 
 def getKey(): #generating key with PBKDF2 for AES
     password = "s3cr3t*c0d3"
@@ -47,6 +340,128 @@ def decrypt(enc): #AES data decryption
 def CreateTender(request):
     if request.method == 'GET':
        return render(request, 'CreateTender.html', {})
+
+def OfficerNotifications(request):
+    """Notification page for tender officers to view unread notifications and bid edit requests"""
+    if request.method == 'GET':
+        # Collect all notifications from blockchain
+        notifications = []
+        edit_requests = []
+        new_tenders = []
+        new_bids = []
+        
+        # First, process notification read status if requested
+        notification_id = request.GET.get('mark_read', '')
+        if notification_id:
+            # Mark notification as read
+            try:
+                notification_id = int(notification_id)
+                for i in range(len(blockchain.chain)):
+                    if i > 0 and i == notification_id:
+                        b = blockchain.chain[i]
+                        data = b.transactions[0]
+                        data = base64.b64decode(data)
+                        data = str(decrypt(data))
+                        data = data[2:len(data)-1]
+                        arr = data.split("#")
+                        
+                        if arr[0] == "notification" and arr[-1] == "unread":
+                            # Replace with read version
+                            new_data = data.replace("#unread", "#read")
+                            new_data = new_data.encode()
+                            new_data = base64.b64encode(encrypt(new_data))
+                            transaction = new_data.decode("utf-8")
+                            blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+                            break
+            except:
+                pass
+        
+        # Process bid edit action if requested
+        action = request.GET.get('action', '')
+        tender_title = request.GET.get('tender', '')
+        bidder = request.GET.get('bidder', '')
+        
+        if action and tender_title and bidder:
+            if action in ['approve', 'reject']:
+                # Create edit approval/rejection record
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                edit_response = f"edit_approval#{tender_title}#{bidder}#{action}#{timestamp}"
+                edit_response = edit_response.encode()
+                edit_response = base64.b64encode(encrypt(edit_response))
+                transaction = edit_response.decode("utf-8")
+                blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+                
+                # Create notification for bidder
+                notification = f"notification#{action}_edit#{tender_title}#{timestamp}#{bidder}#unread"
+                notification = notification.encode()
+                notification = base64.b64encode(encrypt(notification))
+                transaction = notification.decode("utf-8")
+                blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+                
+                messages.success(request, f"Bid edit request {action}d successfully.")
+                return redirect('OfficerNotifications')
+        
+        # Count unread notifications
+        unread_count = 0
+        
+        # Scan blockchain for notifications
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "notification":
+                        notification_type = arr[1]
+                        # Check if notification is unread
+                        is_unread = arr[-1] == "unread"
+                        
+                        if is_unread:
+                            unread_count += 1
+                        
+                        if notification_type == "edit_request":
+                            # Format: notification#edit_request#tender_title#bidder_name#timestamp#unread/read
+                            edit_requests.append({
+                                'id': i,
+                                'tender': arr[2],
+                                'bidder': arr[3],
+                                'timestamp': arr[4],
+                                'unread': is_unread
+                            })
+                        elif notification_type == "new_tender":
+                            # Format: notification#new_tender#tender_title#timestamp#unread/read
+                            new_tenders.append({
+                                'id': i,
+                                'tender': arr[2],
+                                'timestamp': arr[3],
+                                'unread': is_unread
+                            })
+                        elif notification_type == "new_bid":
+                            # Format: notification#new_bid#tender_title#bidder_name#amount#timestamp#unread/read
+                            new_bids.append({
+                                'id': i,
+                                'tender': arr[2],
+                                'bidder': arr[3],
+                                'amount': arr[4],
+                                'timestamp': arr[5],
+                                'unread': is_unread
+                            })
+                except Exception as e:
+                    print(f"Error processing notification: {str(e)}")
+                    pass
+        
+        # Render the notifications template
+        context = {
+            'edit_requests': edit_requests,
+            'new_tenders': new_tenders,
+            'new_bids': new_bids,
+            'unread_count': unread_count
+        }
+        return render(request, 'OfficerNotifications.html', context)
 
 def OfficerOngoingTenders(request):
     from datetime import datetime
@@ -376,149 +791,196 @@ def is_tender_closed_early(tender_title):
                 pass
     return False, None
 
+
+def get_cached_tenders(current_user):
+    """Get active tenders with user bid status, using cache when possible"""
+    global _blockchain_cache
+    cache_key = f'active_tenders_{current_user}'
+    
+    # Return cached data if available and recent
+    if not should_update_cache() and cache_key in _blockchain_cache['tender_data']:
+        _blockchain_cache['cache_hits'] += 1
+        return _blockchain_cache['tender_data'][cache_key]
+    
+    _blockchain_cache['cache_misses'] += 1
+    
+    # Process blockchain data for tenders and bids
+    tender_list = []
+    user_bids = {}
+    deleted_tenders = {}
+    awarded_tenders = {}
+    closed_tenders = {}
+    
+    # First pass: collect metadata about tenders (deleted, awarded, closed) and user bids
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                # Track user bids
+                if arr[0] == 'bidding' and len(arr) >= 5:
+                    bidder_name = arr[4]
+                    tender_title = arr[1]
+                    if current_user == bidder_name:
+                        user_bids[tender_title] = True
+                
+                # Track tender status changes
+                elif arr[0] == "delete_tender" and len(arr) >= 2:
+                    deleted_tenders[arr[1]] = True
+                elif arr[0] == "award_tender" and len(arr) >= 2:
+                    awarded_tenders[arr[1]] = True
+                elif arr[0] == "close_tender" and len(arr) >= 2:
+                    closed_tenders[arr[1]] = True
+                elif arr[0] == "winner" and len(arr) >= 2:
+                    awarded_tenders[arr[1]] = True
+            except Exception:
+                continue
+
+    # Second pass: collect active tenders that aren't deleted, awarded, or closed
+    for i in range(len(blockchain.chain)):
+        if i > 0:
+            try:
+                b = blockchain.chain[i]
+                data = b.transactions[0]
+                data = base64.b64decode(data)
+                data = str(decrypt(data))
+                data = data[2:len(data)-1]
+                arr = data.split("#")
+                
+                if arr[0] == 'tender' and len(arr) >= 9:
+                    tender_title = arr[1]
+                    
+                    # Skip if tender has been deleted, awarded or closed
+                    if (tender_title in deleted_tenders or 
+                        tender_title in awarded_tenders or 
+                        tender_title in closed_tenders):
+                        continue
+                    
+                    # Extract tender data
+                    tender_data = {
+                        'title': arr[1],
+                        'description': arr[2],
+                        'start_date': arr[3],
+                        'end_date': arr[4],
+                        'amount': arr[5],
+                        'industry': arr[6],
+                        'tender_type': arr[7] if len(arr) > 7 else 'General',
+                        'created_by': arr[8] if len(arr) > 8 else 'Unknown',
+                        'has_submitted_bid': tender_title in user_bids
+                    }
+                    
+                    # Check if the tender is active based on dates
+                    now = datetime.datetime.now()
+                    open_dt = None
+                    close_dt = None
+                    
+                    # Try multiple date formats
+                    for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"]:
+                        try:
+                            open_dt = datetime.datetime.strptime(tender_data['start_date'], fmt)
+                            break
+                        except:
+                            continue
+                            
+                    for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"]:
+                        try:
+                            close_dt = datetime.datetime.strptime(tender_data['end_date'], fmt)
+                            break
+                        except:
+                            continue
+                    
+                    # Skip tenders that couldn't be parsed or are closed
+                    if open_dt is None or close_dt is None or close_dt < now:
+                        continue
+                        
+                    tender_list.append(tender_data)
+            except Exception:
+                continue
+    
+    # Update cache
+    _blockchain_cache['tender_data'][cache_key] = tender_list
+    
+    return tender_list
+
+
 def BidTender(request):
+    """View to display active tenders for bidding with improved loading speed"""
     if request.method == 'GET':
-        # Create modern card-based layout instead of table
-        output = '<div class="tender-grid">'
+        # Get current user
+        current_user = get_current_user()
         
-        current_date = datetime.now()
-        current = int(round(current_date.timestamp()))
-        now = datetime.now()
+        # Get cached tenders or fetch them if cache is invalid
+        tenders = get_cached_tenders(current_user)
+        
+        # Create modern card-based layout
+        output = '<div class="tender-grid">'
         found_tenders = False
         
-        # For debugging - keep track of tenders and why they're filtered out
-        all_tenders = 0
-        filtered_tenders = 0
-        debug_log = []
-        
-        # First, find all tenders with winners
-        winner_titles = set()
-        for i in range(len(blockchain.chain)):
-            if i > 0:
+        # Generate HTML for each tender
+        for tender in tenders:
+            found_tenders = True
+            title = tender['title']
+            description = tender['description']
+            open_date = tender['start_date']
+            close_date = tender['end_date']
+            amount = tender['amount']
+            industry = tender['industry']
+            has_submitted_bid = tender['has_submitted_bid']
+            
+            # Check if tender is in the future
+            now = datetime.datetime.now()
+            open_dt = None
+            for fmt in ["%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"]:
                 try:
-                    b = blockchain.chain[i]
-                    data = b.transactions[0]
-                    data = base64.b64decode(data)
-                    data = str(decrypt(data))
-                    data = data[2:len(data)-1]
-                    
-                    arr = data.split("#")
-                    if arr[0] == "winner":
-                        tender_title = arr[1]
-                        winner_titles.add(tender_title)
-                except Exception:
-                    pass
-        
-        for i in range(len(blockchain.chain)):
-            if i > 0:
-                try:
-                    b = blockchain.chain[i]
-                    data = b.transactions[0]
-                    data = base64.b64decode(data)
-                    data = str(decrypt(data))
-                    data = data[2:len(data)-1]
-                    
-                    arr = data.split("#")
-                    if arr[0] == "tender":
-                        all_tenders += 1
-                        title = arr[1]
-                        
-                        # Skip tenders that have been deleted
-                        if is_tender_deleted(title):
-                            filtered_tenders += 1
-                            debug_log.append(f"Skipping deleted tender: {title}")
-                            continue
-                        
-                        # Skip tenders that have winners
-                        if title in winner_titles:
-                            filtered_tenders += 1
-                            debug_log.append(f"Skipping awarded tender: {title}")
-                            continue
-                            
-                        # Skip tenders that have been manually closed early
-                        closed_early, _ = is_tender_closed_early(title)
-                        if closed_early:
-                            filtered_tenders += 1
-                            debug_log.append(f"Skipping closed tender: {title}")
-                            continue
-                        
-                        description = arr[2]
-                        open_date = arr[3]
-                        close_date = arr[4]
-                        amount = arr[5]
-                        industry = arr[6] if len(arr) > 6 else 'General'
-                        
-                        # Parse dates using multiple formats (same as officer view)
-                        open_dt = None
-                        close_dt = None
-                        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
-                            try:
-                                open_dt = datetime.strptime(open_date, fmt)
-                                break
-                            except Exception:
-                                continue
-                                
-                        for fmt in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%Y/%m/%d"):
-                            try:
-                                close_dt = datetime.strptime(close_date, fmt)
-                                break
-                            except Exception:
-                                continue
-                        
-                        # Skip if dates couldn't be parsed
-                        if open_dt is None or close_dt is None:
-                            debug_log.append(f"Skipping tender with invalid dates: {title}")
-                            continue
-                            
-                        # Skip closed tenders
-                        if close_dt < now:
-                            debug_log.append(f"Skipping tender that's already closed: {title}")
-                            continue
-                        
-                        # Add a flag for future tenders (not open yet but viewable)
-                        is_future = open_dt > now
-                        
-                        # Mark that we found at least one tender
-                        found_tenders = True
-                        
-                        # Create a modern card for each tender with consistent height
-                        output += f'''<div class="tender-card">
-                            <div class="tender-card-header">
-                                <h4>{title}</h4>
-                                <span class="badge badge-success"><i class="fas fa-clock"></i> Open To Bid</span>
-                            </div>
-                            <div class="tender-card-body">
-                                <p class="description"><i class="fas fa-info-circle"></i> {description[:100]}{'...' if len(description) > 100 else ''}</p>
-                                <div class="details-row">
-                                    <div class="detail-item"><i class="fas fa-calendar-plus"></i> Open: {open_date}</div>
-                                    <div class="detail-item"><i class="fas fa-calendar-times"></i> Close: {close_date}</div>
-                                    <div class="detail-item"><i class="fas fa-coins"></i> Amount: {amount}</div>
-                                </div>
-                                <div class="category-info">
-                                    <div class="detail-item"><i class="fas fa-industry"></i> Industry: {industry}</div>
-                                </div>
-                            </div>
-                            <div class="tender-card-actions">
-                                <a href="TenderDetail?title={title}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> View Details</a>
-                                <a href="BidTenderAction?title={title}" class="btn btn-sm action-btn"><i class="fas fa-gavel"></i> Bid Now</a>
-                            </div>
-                        </div>'''
-                except Exception as e:
-                    # Log exception but continue processing other blocks
-                    print(f"Error processing block {i}: {str(e)}")
-                    pass
+                    open_dt = datetime.datetime.strptime(open_date, fmt)
+                    break
+                except:
+                    continue
+            
+            is_future = open_dt and open_dt > now
+            
+            # Create a modern card for each tender with consistent height
+            output += f'''<div class="tender-card">
+                <div class="tender-card-header">
+                    <h4>{title}</h4>
+                    <span class="badge badge-success"><i class="fas fa-clock"></i> {"Upcoming" if is_future else "Open To Bid"}</span>
+                </div>
+                <div class="tender-card-body">
+                    <div class="tender-details">
+                        <p><i class="fas fa-calendar-plus"></i> Open: {open_date}</p>
+                        <p><i class="fas fa-calendar-times"></i> Close: {close_date}</p>
+                        <p><i class="fas fa-coins"></i> Amount: {amount}</p>
+                        <p><i class="fas fa-industry"></i> Industry: {industry}</p>
+                    </div>
+                </div>
+                <div class="tender-card-actions">
+                    <a href="TenderDetail?title={title}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i> View Details</a>
+                    {'' if has_submitted_bid else f'<a href="BidTenderAction?title={title}" class="btn btn-sm action-btn"><i class="fas fa-gavel"></i> Submit Bid</a>'}
+                    {f'<span class="badge badge-info mt-2"><i class="fas fa-check-circle"></i> Bid Submitted</span>' if has_submitted_bid else ''}
+                </div>
+            </div>'''
         
         output += '</div>'
         
         # Only set the output if tenders were found
         if not found_tenders:
             output = ''
-            
-        context = {'data': output}
+        
+        # Add unread notification count to the context
+        unread_notification_count = get_unread_notifications_count(current_user)
+        
+        context = {
+            'data': output,
+            'unread_notification_count': unread_notification_count
+        }
         return render(request, 'BidTender.html', context)
-
-
 def TenderDetail(request):
+    """View tender details with optimized loading"""
     if request.method == 'GET':
         # Get the tender title from the query parameters
         title = request.GET.get('title', '')
@@ -531,6 +993,10 @@ def TenderDetail(request):
             # Return with no tender data to show the 'Tender Not Found' message
             context = {'tender': None}
             return render(request, 'TenderDetail.html', context)
+        
+        # Get current user for notification count
+        current_user = get_current_user()
+        unread_notification_count = get_unread_notifications_count(current_user)
         
         # Search for the tender in the blockchain
         for i in range(len(blockchain.chain)):
@@ -556,10 +1022,10 @@ def TenderDetail(request):
                                 'close_date': arr[4],
                                 'amount': arr[5],
                                 'industry': arr[6],
-                                'category': arr[7],
-                                'location': arr[8],
-                                'eligibility': arr[9],
-                                'specifications': arr[10]
+                                'category': arr[7] if len(arr) > 7 else '',
+                                'location': arr[8] if len(arr) > 8 else '',
+                                'eligibility': arr[9] if len(arr) > 9 else '',
+                                'specifications': arr[10] if len(arr) > 10 else ''
                             }
                             break
                 except Exception as e:
@@ -567,7 +1033,10 @@ def TenderDetail(request):
                     print(f"Error processing tender details for {title}: {str(e)}")
                     pass
         
-        context = {'tender': tender_data}
+        context = {
+            'tender': tender_data,
+            'unread_notification_count': unread_notification_count
+        }
         return render(request, 'TenderDetail.html', context)
 
 
@@ -585,12 +1054,17 @@ def ViewTender(request):
             
         # Use modern table styling that works with our CSS
         output = '<table class="table table-striped">'
-        output += '<thead><tr><th>Tender Title</th><th>Amount</th><th>Username</th><th>Status</th></tr></thead><tbody>'
+        output += '<thead><tr><th>Tender Title</th><th>Amount</th><th>Username</th><th>Status</th><th>Action</th></tr></thead><tbody>'
         
         bids_found = False
         user_bids = {}
         
         # First pass: collect all biddings by the current user to avoid redundant blockchain scanning
+        # Also check for edit requests and approvals
+        edit_requests = {}
+        edit_approvals = {}
+        
+        # First check for edit approvals
         for i in range(len(blockchain.chain)):
             if i > 0:
                 try:
@@ -601,14 +1075,53 @@ def ViewTender(request):
                     data = data[2:len(data)-1]
                     arr = data.split("#")
                     
-                    if arr[0] == "bidding" and arr[3] == current_user:
+                    if arr[0] == "edit_approval" and arr[2] == current_user:
+                        edit_approvals[arr[1]] = arr[3]  # tender_title: approval_status
+                except Exception:
+                    pass
+        
+        # Then check for edit requests
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "edit_request" and arr[2] == current_user:
+                        edit_requests[arr[1]] = True  # tender_title: requested
+                except Exception:
+                    pass
+                    
+        # Now collect all bids
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "bidding" and arr[4] == current_user:
                         bids_found = True
                         tender_title = arr[1]
+                        
+                        edit_status = "none"
+                        if tender_title in edit_requests:
+                            edit_status = "requested"
+                        if tender_title in edit_approvals:
+                            edit_status = edit_approvals[tender_title]  # approved or rejected
                         
                         if tender_title not in user_bids:
                             user_bids[tender_title] = {
                                 'amount': arr[2],
-                                'status': getWinners(arr[1], arr[3])
+                                'status': getWinners(arr[1], arr[4]),
+                                'edit_status': edit_status
                             }
                 except Exception as e:
                     # Skip any entries with parsing issues
@@ -632,11 +1145,30 @@ def ViewTender(request):
                 status_class = 'info'
                 status_icon = 'hourglass'
             
+            # Add action buttons based on status and edit_status
+            edit_status = bid_info.get('edit_status', 'none')
+            action_buttons = ''
+            
+            if status == 'Pending':
+                if edit_status == 'none':
+                    # Show request edit button
+                    action_buttons = f'<a href="RequestBidEdit?title={title}" class="btn btn-sm btn-outline-primary"><i class="fas fa-edit"></i> Request Edit</a>'
+                elif edit_status == 'requested':
+                    # Show pending request badge
+                    action_buttons = f'<span class="badge badge-warning"><i class="fas fa-clock"></i> Edit Requested</span>'
+                elif edit_status == 'approved':
+                    # Show edit button
+                    action_buttons = f'<a href="BidTenderAction?title={title}&edit=true" class="btn btn-sm btn-success"><i class="fas fa-pen"></i> Edit Bid</a>'
+                elif edit_status == 'rejected':
+                    # Show rejected badge
+                    action_buttons = f'<span class="badge badge-danger"><i class="fas fa-times-circle"></i> Edit Rejected</span>'
+            
             output += f'<tr>'
             output += f'<td>{title}</td>'
             output += f'<td>{bid_info["amount"]}</td>'
             output += f'<td>{current_user}</td>'
             output += f'<td><span class="badge badge-{status_class}"><i class="fas fa-{status_icon}"></i> {status}</span></td>'
+            output += f'<td>{action_buttons}</td>'
             output += f'</tr>'
         
         output += '</tbody></table>'
@@ -647,6 +1179,88 @@ def ViewTender(request):
             
         context = {'data': output}
         return render(request, 'ViewTender.html', context)
+
+def RequestBidEdit(request):
+    """Handle bid edit requests from bidders"""
+    if request.method == 'GET':
+        title = request.GET.get('title', '')
+        title = title.replace('"', '')
+        
+        if not title:
+            return HttpResponse("Invalid request. Missing tender title.")
+        
+        # Get current user from session
+        current_user = ''
+        try:
+            with open("session.txt", "r") as file:
+                for line in file:
+                    current_user = line.strip('\n')
+            file.close()
+        except:
+            return HttpResponse("Session error. Please log in again.")
+        
+        # Check if bid exists for this user and tender
+        bid_exists = False
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "bidding" and arr[1] == title and arr[4] == current_user:
+                        bid_exists = True
+                        break
+                except Exception:
+                    pass
+        
+        if not bid_exists:
+            return HttpResponse("You have not placed a bid for this tender.")
+        
+        # Check if an edit request already exists
+        request_exists = False
+        for i in range(len(blockchain.chain)):
+            if i > 0:
+                try:
+                    b = blockchain.chain[i]
+                    data = b.transactions[0]
+                    data = base64.b64decode(data)
+                    data = str(decrypt(data))
+                    data = data[2:len(data)-1]
+                    arr = data.split("#")
+                    
+                    if arr[0] == "edit_request" and arr[1] == title and arr[2] == current_user:
+                        request_exists = True
+                        break
+                except Exception:
+                    pass
+        
+        if request_exists:
+            return HttpResponse("You have already requested to edit this bid. Please wait for approval.")
+        
+        # Create edit request
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        edit_request = f"edit_request#{title}#{current_user}#{timestamp}"
+        
+        # Encrypt and add to blockchain
+        edit_request = edit_request.encode()
+        edit_request = base64.b64encode(encrypt(edit_request))
+        transaction = edit_request.decode("utf-8")
+        blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+        
+        # Create notification for tender officer
+        notification_data = f"notification#edit_request#{title}#{current_user}#{timestamp}#unread"
+        notification_data = notification_data.encode()
+        notification_data = base64.b64encode(encrypt(notification_data))
+        transaction = notification_data.decode("utf-8")
+        blockchain.add_block(Block(len(blockchain.chain), str(datetime.datetime.now()), transaction, ""))
+        
+        # Redirect back to ViewTender page with success message
+        messages.success(request, "Edit request submitted successfully! Please wait for officer approval.")
+        return redirect('ViewTender')
 
 def getWinner(title):
     output = 'none'
