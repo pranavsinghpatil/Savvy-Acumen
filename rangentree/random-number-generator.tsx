@@ -1,4 +1,3 @@
-"use client";
 import React, { useState, useEffect } from 'react';
 import { Shuffle, Check, SkipForward, Bookmark, Trash2, List, Download, Settings, X, Lock } from 'lucide-react';
 
@@ -75,65 +74,39 @@ const DEFAULT_CONFIG = {
   ]
 };
 
-type CurrentNumber = {
-  topicIndex: number;
-  topicName: string;
-  subgroup: string;
-  number: number;
-  key: string;
-} | null;
-
-type BookmarkedNumber = {
-  topicIndex: number;
-  topicName: string;
-  subgroup: string;
-  number: number;
-  key: string;
-  timestamp: string;
-};
-
-type SkippedNumber = {
-  topicIndex: number;
-  topicName: string;
-  subgroup: string;
-  number: number;
-  key: string;
-  timestamp: string;
-};
-
-function Page() {
+export default function RandomNumberGenerator() {
   const [config, setConfig] = useState(DEFAULT_CONFIG);
-  const [currentNumber, setCurrentNumber] = useState<CurrentNumber>(null);
+  const [currentNumber, setCurrentNumber] = useState(null);
   const [doneNumbers, setDoneNumbers] = useState(new Set());
-  const [bookmarkedNumbers, setBookmarkedNumbers] = useState<BookmarkedNumber[]>([]);
+  const [bookmarkedNumbers, setBookmarkedNumbers] = useState([]);
   const [showBookmarks, setShowBookmarks] = useState(false);
-  const [stats, setStats] = useState({ remaining: 0, done: 0, bookmarked: 0, total: 0 });
-  const [skippedNumbers, setSkippedNumbers] = useState<SkippedNumber[]>([]);
+  const [stats, setStats] = useState({ remaining: 0, done: 0, bookmarked: 0 });
+  const [skippedNumbers, setSkippedNumbers] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authKey, setAuthKey] = useState('');
   const [tempConfig, setTempConfig] = useState(DEFAULT_CONFIG);
 
   useEffect(() => {
-    const loadData = () => {
+    const loadData = async () => {
       try {
-        const configResult = localStorage.getItem('app-config');
-        const doneResult = localStorage.getItem('done-numbers');
-        const bookmarkResult = localStorage.getItem('bookmarked-numbers');
-        const skippedResult = localStorage.getItem('skipped-numbers');
+        const configResult = await window.storage.get('app-config', true);
+        const doneResult = await window.storage.get('done-numbers', true);
+        const bookmarkResult = await window.storage.get('bookmarked-numbers', true);
+        const skippedResult = await window.storage.get('skipped-numbers', true);
         
-        if (configResult) {
-          setConfig(JSON.parse(configResult));
-          setTempConfig(JSON.parse(configResult));
+        if (configResult?.value) {
+          setConfig(JSON.parse(configResult.value));
+          setTempConfig(JSON.parse(configResult.value));
         }
-        if (doneResult) {
-          setDoneNumbers(new Set(JSON.parse(doneResult)));
+        if (doneResult?.value) {
+          setDoneNumbers(new Set(JSON.parse(doneResult.value)));
         }
-        if (bookmarkResult) {
-          setBookmarkedNumbers(JSON.parse(bookmarkResult));
+        if (bookmarkResult?.value) {
+          setBookmarkedNumbers(JSON.parse(bookmarkResult.value));
         }
-        if (skippedResult) {
-          setSkippedNumbers(JSON.parse(skippedResult));
+        if (skippedResult?.value) {
+          setSkippedNumbers(JSON.parse(skippedResult.value));
         }
       } catch (error) {
         console.log('No saved data found, starting fresh');
@@ -146,7 +119,7 @@ function Page() {
     let total = 0;
     for (const topic of config.topics) {
       for (const count of Object.values(topic.subgroups)) {
-        total += count as number;
+        total += count;
       }
     }
     
@@ -158,7 +131,7 @@ function Page() {
     });
   }, [doneNumbers, bookmarkedNumbers, config]);
 
-  const generateKey = (topicIndex: number, subgroup: string, number: number) => `${topicIndex}-${subgroup}-${number}`;
+  const generateKey = (topicIndex, subgroup, number) => `${topicIndex}-${subgroup}-${number}`;
 
   const generateRandom = () => {
     const maxAttempts = 100;
@@ -172,17 +145,17 @@ function Page() {
       if (availableSubgroups.length === 0) continue;
       
       const [subgroup, maxCount] = availableSubgroups[Math.floor(Math.random() * availableSubgroups.length)];
-      const number = Math.floor(Math.random() * (maxCount as number)) + 1;
+      const number = Math.floor(Math.random() * maxCount) + 1;
       
       const key = generateKey(topicIndex, subgroup, number);
       
       if (!doneNumbers.has(key)) {
-        setCurrentNumber({
-          topicIndex,
+        setCurrentNumber({ 
+          topicIndex, 
           topicName: topic.name,
-          subgroup,
-          number,
-          key
+          subgroup, 
+          number, 
+          key 
         });
         return;
       }
@@ -192,7 +165,7 @@ function Page() {
     alert('All numbers have been marked as done! Reset to continue.');
   };
 
-  const handleDone = () => {
+  const handleDone = async () => {
     if (!currentNumber) return;
     
     const newDone = new Set(doneNumbers);
@@ -200,7 +173,7 @@ function Page() {
     setDoneNumbers(newDone);
     
     try {
-      localStorage.setItem('done-numbers', JSON.stringify([...newDone]));
+      await window.storage.set('done-numbers', JSON.stringify([...newDone]), true);
     } catch (error) {
       console.error('Failed to save:', error);
     }
@@ -208,10 +181,10 @@ function Page() {
     setCurrentNumber(null);
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
     if (!currentNumber) return;
     
-    const skip: SkippedNumber = {
+    const skip = {
       ...currentNumber,
       timestamp: new Date().toISOString()
     };
@@ -220,7 +193,7 @@ function Page() {
     setSkippedNumbers(newSkipped);
     
     try {
-      localStorage.setItem('skipped-numbers', JSON.stringify(newSkipped));
+      await window.storage.set('skipped-numbers', JSON.stringify(newSkipped), true);
     } catch (error) {
       console.error('Failed to save skip:', error);
     }
@@ -228,10 +201,10 @@ function Page() {
     setCurrentNumber(null);
   };
 
-  const handleBookmark = () => {
+  const handleBookmark = async () => {
     if (!currentNumber) return;
     
-    const bookmark: BookmarkedNumber = {
+    const bookmark = {
       ...currentNumber,
       timestamp: new Date().toISOString()
     };
@@ -240,7 +213,7 @@ function Page() {
     setBookmarkedNumbers(newBookmarks);
     
     try {
-      localStorage.setItem('bookmarked-numbers', JSON.stringify(newBookmarks));
+      await window.storage.set('bookmarked-numbers', JSON.stringify(newBookmarks), true);
     } catch (error) {
       console.error('Failed to save bookmark:', error);
     }
@@ -248,18 +221,18 @@ function Page() {
     setCurrentNumber(null);
   };
 
-  const removeBookmark = (index: number) => {
+  const removeBookmark = async (index) => {
     const newBookmarks = bookmarkedNumbers.filter((_, i) => i !== index);
     setBookmarkedNumbers(newBookmarks);
     
     try {
-      localStorage.setItem('bookmarked-numbers', JSON.stringify(newBookmarks));
+      await window.storage.set('bookmarked-numbers', JSON.stringify(newBookmarks), true);
     } catch (error) {
       console.error('Failed to remove bookmark:', error);
     }
   };
 
-  const resetAll = () => {
+  const resetAll = async () => {
     if (window.confirm('Are you sure you want to reset all data? This will clear all done items and bookmarks.')) {
       setDoneNumbers(new Set());
       setBookmarkedNumbers([]);
@@ -267,9 +240,9 @@ function Page() {
       setCurrentNumber(null);
       
       try {
-        localStorage.removeItem('done-numbers');
-        localStorage.removeItem('bookmarked-numbers');
-        localStorage.removeItem('skipped-numbers');
+        await window.storage.delete('done-numbers', true);
+        await window.storage.delete('bookmarked-numbers', true);
+        await window.storage.delete('skipped-numbers', true);
       } catch (error) {
         console.error('Failed to reset:', error);
       }
@@ -277,11 +250,11 @@ function Page() {
   };
 
   const downloadData = () => {
-    const allCombinations: any[] = [];
+    const allCombinations = [];
     
     config.topics.forEach((topic, topicIndex) => {
       Object.entries(topic.subgroups).forEach(([subgroup, maxCount]) => {
-        for (let number = 1; number <= (maxCount as number); number++) {
+        for (let number = 1; number <= maxCount; number++) {
           const key = generateKey(topicIndex, subgroup, number);
           let status = 'Remaining';
           
@@ -332,13 +305,13 @@ function Page() {
     }
   };
 
-  const handleConfigSave = () => {
+  const handleConfigSave = async () => {
     if (window.confirm('Are you sure you want to change the configuration? This will download your current data first.')) {
       downloadData();
       
       setConfig(tempConfig);
       try {
-        localStorage.setItem('app-config', JSON.stringify(tempConfig));
+        await window.storage.set('app-config', JSON.stringify(tempConfig), true);
         alert('Configuration updated successfully!');
         setShowSettings(false);
         setIsAuthenticated(false);
@@ -613,5 +586,3 @@ function Page() {
     </div>
   );
 }
-
-export default Page;

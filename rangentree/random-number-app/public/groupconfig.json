@@ -1,0 +1,157 @@
+{
+    "topics": [
+        {
+            "name": "General Arithmetic",
+            "subgroups": {
+                "QC": 51,
+                "PS": 50,
+                "MAC": 36,
+                "NE": 35
+            }
+        },
+        {
+            "name": "Sequences And Series",
+            "subgroups": {
+                "QC": 37,
+                "PS": 45,
+                "MAC": 9,
+                "NE": 14
+            }
+        },
+        {
+            "name": "Exponents & Roots",
+            "subgroups": {
+                "QC": 53,
+                "PS": 51,
+                "MAC": 34,
+                "NE": 40
+            }
+        },
+        {
+            "name": "Percentages",
+            "subgroups": {
+                "QC": 40,
+                "PS": 50,
+                "MAC": 13,
+                "NE": 42
+            }
+        },
+        {
+            "name": "Single AND Compound Interest",
+            "subgroups": {
+                "QC": 14,
+                "PS": 23,
+                "MAC": 1,
+                "NE": 5
+            }
+        },
+        {
+            "name": "Overlapping Sets",
+            "subgroups": {
+                "QC": 27,
+                "PS": 52,
+                "MAC": 18,
+                "NE": 7
+            }
+        },
+        {
+            "name": "Number system",
+            "subgroups": {
+                "QC": 101,
+                "PS": 81,
+                "MAC": 41,
+                "NE": 47
+            }
+        },
+        {
+            "name": "Equations + Ratios",
+            "subgroups": {
+                "QC": 29,
+                "PS": 43,
+                "MAC": 0,
+                "NE": 8
+            }
+        },
+        {
+            "name": "Inequalities and Modulus",
+            "subgroups": {
+                "QC": 60,
+                "PS": 59,
+                "MAC": 37,
+                "NE": 14
+            }
+        },
+        {
+            "name": "Statistics",
+            "subgroups": {
+                "QC": 64,
+                "PS": 72,
+                "MAC": 34,
+                "NE": 25
+            }
+        },
+        {
+            "name": "Permutations and Combinations",
+            "subgroups": {
+                "QC": 36,
+                "PS": 59,
+                "MAC": 10,
+                "NE": 38
+            }
+        },
+        {
+            "name": "Probability",
+            "subgroups": {
+                "QC": 72,
+                "PS": 40,
+                "MAC": 11,
+                "NE": 34
+            }
+        },
+        {
+            "name": "Coordinate Geometry and Functions",
+            "subgroups": {
+                "QC": 65,
+                "PS": 67,
+                "MAC": 53,
+                "NE": 22
+            }
+        },
+        {
+            "name": "Speed, Time, Distance and Work Rate",
+            "subgroups": {
+                "QC": 60,
+                "PS": 75,
+                "MAC": 9,
+                "NE": 27
+            }
+        },
+        {
+            "name": "Geometry",
+            "subgroups": {
+                "QC": 107,
+                "PS": 80,
+                "MAC": 0,
+                "DIA": 38
+            }
+        },
+        {
+            "name": "Data Interpretation Sets",
+            "subgroups": {
+                "QC": 107,
+                "PS": 80,
+                "MAC": 71,
+                "NE": 0
+            }
+        },
+        {
+            "name": "Miscellaneous",
+            "subgroups": {
+                "QC": 20,
+                "PS": 20,
+                "MAC": 20,
+                "NE": 20
+            }
+        }
+    ]
+}
