@@ -1,36 +1,46 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GRE Quant Generator
 
-## Getting Started
+This is a web application built with Next.js that helps you practice for the GRE Quantitative Reasoning section by generating random questions from a configurable question bank.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+*   **Random Question Generation:** Get a random question from a wide range of topics and sub-topics.
+*   **Progress Tracking:** Mark questions as "Done" to keep track of what you've completed.
+*   **Bookmarking:** Save questions for later review.
+*   **Skip Questions:** Skip questions you don't want to answer immediately.
+*   **Data Export:** Download your progress, including the status of all questions (Remaining, Done, Bookmarked, Skipped), as a CSV file.
+*   **Customizable Configuration:** Access settings to customize the question topics and the number of questions in each subgroup.
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## How to Use
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1.  **Generate a Question:** Click the "Generate Random" button to get a new question.
+2.  **Answer and Track:**
+    *   Click **Done** if you have completed the question.
+    *   Click **Skip** to move to the next question without marking the current one as done.
+    *   Click **Bookmark** to save the question for later.
+3.  **View Bookmarks:** Click "Show Bookmarks" to see your saved questions.
+4.  **Download Data:** Click "Download Data" to get a CSV file of your progress.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Settings
 
-## Learn More
+You can customize the question bank by clicking on the **Settings** icon. To access the settings, you will need to enter an authentication key.
 
-To learn more about Next.js, take a look at the following resources:
+**Authentication Key:** `randombuiltbypranav`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+In the settings, you can:
+*   View statistics about the question bank.
+*   Reset all your progress data (done, skipped, and bookmarked questions).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Question Bank
 
-## Deploy on Vercel
+The questions are based on the GRE Premium Quant Question Banks from GRE Prep Club. You can find the original question bank at the following link:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+[GRE Premium Quant Question Banks (Topic Wise) - 2700+ Questions](https://gre.myprepclub.com/forum/gre-premium-quant-question-banks-topic-wise-2700-questions-34207.html#p116113)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Tech Stack
+
+*   [Next.js](https://nextjs.org/)
+*   [React](https://react.dev/)
+*   [TypeScript](https://www.typescriptlang.org/)
+*   [Tailwind CSS](https://tailwindcss.com/)
+*   [Lucide React](https://lucide.dev/guide/packages/lucide-react) for icons.
